@@ -4,10 +4,10 @@ import ru.deewend.tennessinec.exporter.Exporter;
 
 import java.nio.ByteBuffer;
 
-public class I386PushByte implements Instruction {
+public class I386Push8Word implements Instruction {
     private final byte value;
 
-    public I386PushByte(Exporter exporter, Integer value) {
+    public I386Push8Word(Exporter exporter, Integer value) {
         this.value = value.byteValue();
     }
 

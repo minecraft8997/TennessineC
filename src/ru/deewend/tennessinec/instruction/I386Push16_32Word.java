@@ -4,10 +4,10 @@ import ru.deewend.tennessinec.exporter.Exporter;
 
 import java.nio.ByteBuffer;
 
-public class I386PushPointer implements Instruction {
+public class I386Push16_32Word implements Instruction {
     private final int address;
 
-    public I386PushPointer(Exporter exporter, Integer address) {
+    public I386Push16_32Word(Exporter exporter, Integer address) {
         this.address = address;
     }
 
