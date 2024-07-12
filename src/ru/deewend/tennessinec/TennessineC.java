@@ -20,6 +20,7 @@ public class TennessineC {
     TokenizedCode tokenizedLines;
     Metadata metadata;
     int idx;
+    final Map<String, VariableData> variableMap;
     private final boolean debugPreprocessingResult;
     private final Exporter exporter;
 
@@ -35,6 +36,7 @@ public class TennessineC {
         this.sourceStream = sourceStream;
         this.sourceFilename = sourceFilename;
         this.parentDirectory = parentDirectory;
+        this.variableMap = new HashMap<>();
         this.debugPreprocessingResult = debugPreprocessingResult;
         this.exporter = exporter;
     }
@@ -241,8 +243,9 @@ public class TennessineC {
         int methodCount = 0;
         boolean insideAMethod = false;
         while (hasMoreTokens()) {
-            String nextToken = nextToken();
+            String nextToken;
             if (!insideAMethod) {
+                nextToken = nextToken();
                 if (!nextToken.equals("int") && !nextToken.equals("void")) {
                     tokenizedLines.issue("unexpected token: " + nextToken);
                 }
@@ -258,56 +261,91 @@ public class TennessineC {
 
                 insideAMethod = true;
             }
+            boolean symbol = nextTokenIs(TokenizedCode.TokenType.SYMBOL);
+            nextToken = nextToken();
             if (nextToken.equals("}")) {
                 insideAMethod = false;
                 methodCount++;
 
                 continue;
             }
-            boolean symbol = (hasMoreTokens() && getNextTokenType() == TokenizedCode.TokenType.SYMBOL);
-            nextToken = nextToken();
-            if (!nextToken().equals("(")) {
-                tokenizedLines.issue("expected a method call (any other statements are currently unsupported)");
-            }
-            if (!symbol) {
-                tokenizedLines.issue("unexpected token: " + nextToken);
-            }
-            ExternalMethod method = lookupExternalMethod(nextToken);
-            List<String> parameterTypes = method.getParameterTypes();
+            DataType type = DataType.recognizeDataType(nextToken);
 
-            //if (!parameterTypes.isEmpty()) {
-            int i = 0;
-            List<Pair<String, Integer>> toPush = new ArrayList<>();
-            while (getNextTokenType() == TokenizedCode.TokenType.LITERAL_INTEGER) {
-                if (i == parameterTypes.size()) tokenizedLines.issue("too many arguments");
-
-                int value = Integer.parseInt(nextToken());
-                String type = Helper.uppercaseFirstCharacter(parameterTypes.get(i++));
-                toPush.add(Pair.of(type, value));
-
-                if (i < parameterTypes.size() && !(nextToken = nextToken()).equals(",")) {
-                    tokenizedLines.issue("expected a comma, found: " + nextToken);
+            if (type != null) {
+                handleVariableDefinition(type);
+            } else {
+                if (!nextToken().equals("(")) {
+                    tokenizedLines.issue("expected either a variable declaration or a method call " +
+                            "(any other statements are currently unsupported)");
                 }
-            }
-            if (i != parameterTypes.size()) tokenizedLines.issue("too few arguments");
-            if (!nextToken().equals(")")) {
-                tokenizedLines.issue("expected a closing brace");
-            }
-            i--;
-            for (; i >= 0; i--) {
-                Pair<String, Integer> pair = toPush.get(i);
-                String type = pair.getFirst();
-                int value = pair.getSecond();
+                if (!symbol) {
+                    tokenizedLines.issue("unexpected token: " + nextToken);
+                }
 
-                exporter.putInstruction("Push" + type, value);
+                handleMethodCall(nextToken);
             }
-            //}
 
-            exporter.putInstruction("CallExternalMethod", method.getName());
             if (!(nextToken = nextToken()).equals(";")) tokenizedLines.issue("expected \";\", found: " + nextToken);
         }
 
         addExitProcess();
+    }
+
+    private void handleVariableDefinition(DataType recognizedType) {
+        if (getNextTokenType() != TokenizedCode.TokenType.SYMBOL) {
+            tokenizedLines.issue("expected the next token to be a symbol (variable name)");
+        }
+        String variableName = nextToken();
+        VariableData data;
+        variableMap.put(variableName, (data = VariableData.of(recognizedType)));
+
+        if (nextTokenIs(TokenizedCode.TokenType.STATEMENT_END)) return;
+
+        if (!nextToken().equals("=")) {
+            tokenizedLines.issue("expected an assignment");
+        }
+        if (getNextTokenType() != TokenizedCode.TokenType.LITERAL_INTEGER) {
+            tokenizedLines.issue("expected the next token to be an integer (variable value)");
+        }
+        int value = Integer.parseInt(nextToken());
+
+        data.calculateStackOffset(this);
+        recognizedType.push(exporter, value);
+    }
+
+    private void handleMethodCall(String nextToken) {
+        ExternalMethod method = lookupExternalMethod(nextToken);
+        List<String> parameterTypes = method.getParameterTypes();
+
+        //if (!parameterTypes.isEmpty()) {
+        int i = 0;
+        List<Pair<String, Integer>> toPush = new ArrayList<>();
+        while (getNextTokenType() == TokenizedCode.TokenType.LITERAL_INTEGER) {
+            if (i == parameterTypes.size()) tokenizedLines.issue("too many arguments");
+
+            int value = Integer.parseInt(nextToken());
+            String type = Helper.uppercaseFirstCharacter(parameterTypes.get(i++));
+            toPush.add(Pair.of(type, value));
+
+            if (i < parameterTypes.size() && !(nextToken = nextToken()).equals(",")) {
+                tokenizedLines.issue("expected a comma, found: " + nextToken);
+            }
+        }
+        if (i != parameterTypes.size()) tokenizedLines.issue("too few arguments");
+        if (!nextToken().equals(")")) {
+            tokenizedLines.issue("expected a closing brace");
+        }
+        i--;
+        for (; i >= 0; i--) {
+            Pair<String, Integer> pair = toPush.get(i);
+            String type = pair.getFirst();
+            int value = pair.getSecond();
+
+            exporter.putInstruction("Push" + type, value);
+        }
+        //}
+
+        exporter.putInstruction("CallExternalMethod", method.getName());
     }
 
     private ExternalMethod lookupExternalMethod(String name) {
@@ -337,6 +375,10 @@ public class TennessineC {
         exporter.putInstruction("CallExternalMethod", "ExitProcess");
     }
 
+    private boolean nextTokenIs(TokenizedCode.TokenType type) {
+        return hasMoreTokens() && getNextTokenType() == type;
+    }
+
     private boolean hasMoreTokens() {
         boolean hasMoreTokens = tokenizedLines.hasMoreTokens();
         if (!hasMoreTokens) {
@@ -357,7 +399,11 @@ public class TennessineC {
     }
 
     private String nextToken() {
-        hasMoreTokens();
+        return nextToken(false);
+    }
+
+    private String nextToken(boolean tt) {
+        if (!tt) hasMoreTokens();
 
         return tokenizedLines.nextToken();
     }

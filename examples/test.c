@@ -13,6 +13,7 @@
 #endif
 #endif
 
-int main() {
+void main() {
+    int a = 1;
     MessageBoxA(0, HELLO_WORLD, "TennessineC test", 0);
 }
