@@ -15,6 +15,7 @@ public class TennessineC {
 
     final Set<String> defines;
     private final InputStream sourceStream;
+    private final String sourceFilename;
     final String parentDirectory;
     TokenizedCode tokenizedLines;
     Metadata metadata;
@@ -25,12 +26,14 @@ public class TennessineC {
     public TennessineC(
             Set<String> defines,
             InputStream sourceStream,
+            String sourceFilename,
             String parentDirectory,
             boolean debugPreprocessingResult,
             Exporter exporter
     ) {
         this.defines = new HashSet<>(defines);
         this.sourceStream = sourceStream;
+        this.sourceFilename = sourceFilename;
         this.parentDirectory = parentDirectory;
         this.debugPreprocessingResult = debugPreprocessingResult;
         this.exporter = exporter;
@@ -138,7 +141,8 @@ public class TennessineC {
         TennessineC compiler;
         File file = new File(sourceFile);
         try (InputStream stream = new FileInputStream(file)) {
-            compiler = new TennessineC(defines, stream, file.getParent(), true, exporterObj);
+            compiler = new TennessineC(defines, stream, sourceFile,
+                    file.getParent(), true, exporterObj);
             compiler.load();
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -167,7 +171,7 @@ public class TennessineC {
         // both BufferedStream and InputStreamReader themselves don't hold any native resources, not closing them
         List<List<String>> tokenizedLines = Helper.tokenize(sourceStream);
 
-        this.tokenizedLines = TokenizedCode.of(tokenizedLines);
+        this.tokenizedLines = TokenizedCode.of(tokenizedLines, sourceFilename);
     }
 
     @SuppressWarnings("CallToPrintStackTrace")

@@ -1,6 +1,6 @@
 package ru.deewend.tennessinec;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 
 public class TokenizedCode {
@@ -41,17 +41,20 @@ public class TokenizedCode {
      *  3) List<String> - the line itself (= list of tokens).
      *  This will allow us not to report an "Internal line" in case of an error, which is literally not helpful at all.
      */
-    private final List<List<String>> tokenizedLines;
+    private final List<TokenizedLine> tokenizedLines;
     private int lineIdx;
     private int nextTokenIdx;
-    private boolean linesCountModified;
 
-    private TokenizedCode(List<List<String>> tokenizedLines) {
-        this.tokenizedLines = tokenizedLines;
+    private TokenizedCode(List<List<String>> tokenizedLines, String sourceFilename) {
+        this.tokenizedLines = new ArrayList<>(tokenizedLines.size());
+        for (int i = 0; i < tokenizedLines.size(); i++) {
+            List<String> line = tokenizedLines.get(i);
+            this.tokenizedLines.add(TokenizedLine.of(sourceFilename, (i + 1), line));
+        }
     }
 
-    public static TokenizedCode of(List<List<String>> tokenizedLines) {
-        return new TokenizedCode(tokenizedLines);
+    public static TokenizedCode of(List<List<String>> tokenizedLines, String sourceFilename) {
+        return new TokenizedCode(tokenizedLines, sourceFilename);
     }
 
     public void switchToLine(int lineIdx) {
@@ -62,17 +65,16 @@ public class TokenizedCode {
     }
 
     public List<String> getLine() {
-        return Collections.unmodifiableList(tokenizedLines.get(lineIdx));
+        return tokenizedLines.get(lineIdx).getLineUnmodifiable();
     }
 
-    public void insertFirstLine(List<String> tokenizedLine) {
+    public void insertFirstLine(TokenizedLine tokenizedLine) {
         tokenizedLines.add(0, tokenizedLine);
-        linesCountModified = true;
         lineIdx++;
     }
 
     public boolean hasMoreTokens() {
-        return nextTokenIdx < tokenizedLines.get(lineIdx).size();
+        return nextTokenIdx < tokenizedLines.get(lineIdx).tokenCount();
     }
 
     // note that this moves the cursor
@@ -105,7 +107,7 @@ public class TokenizedCode {
     public String currentToken() {
         if (nextTokenIdx == 0) issue("nextToken(true) has not been called");
 
-        List<String> tokens = tokenizedLines.get(lineIdx);
+        List<String> tokens = tokenizedLines.get(lineIdx).getLineUnmodifiable();
 
         return tokens.get(nextTokenIdx - 1);
     }
@@ -115,7 +117,7 @@ public class TokenizedCode {
     }
 
     public String nextToken(boolean moveCursor) {
-        List<String> tokens = tokenizedLines.get(lineIdx);
+        List<String> tokens = tokenizedLines.get(lineIdx).getLineUnmodifiable();
         if (nextTokenIdx >= tokens.size()) issue("too few tokens");
 
         String result = tokens.get(nextTokenIdx);
@@ -127,7 +129,7 @@ public class TokenizedCode {
     public void patchToken(String newValue) {
         if (nextTokenIdx == 0) issue("nextToken has never been called");
 
-        List<String> tokens = tokenizedLines.get(lineIdx);
+        List<String> tokens = tokenizedLines.get(lineIdx).getLine();
         if (!newValue.isEmpty()) {
             tokens.set(nextTokenIdx - 1, newValue);
         } else {
@@ -137,7 +139,7 @@ public class TokenizedCode {
     }
 
     public void insertToken(String newValue) {
-        List<String> tokens = tokenizedLines.get(lineIdx);
+        List<String> tokens = tokenizedLines.get(lineIdx).getLine();
         if (nextTokenIdx < 0 || nextTokenIdx > tokens.size() /* not >= */) issue("nextTokenIdx: " + nextTokenIdx);
 
         tokens.add(nextTokenIdx++, newValue);
@@ -147,7 +149,6 @@ public class TokenizedCode {
         if (lineIdx < 0 || lineIdx >= tokenizedLines.size()) issue("lineIdx out of bounds: " + lineIdx);
 
         tokenizedLines.remove(lineIdx);
-        linesCountModified = true;
         if (lineIdx == this.lineIdx) {
             this.lineIdx = 0;
             nextTokenIdx = 0;
@@ -156,23 +157,14 @@ public class TokenizedCode {
         }
     }
 
-    public boolean isLinesCountModified() {
-        return linesCountModified;
-    }
-
     public int linesCount() {
         return tokenizedLines.size();
     }
 
     public void issue(String message) {
-        if (linesCountModified) {
-            System.err.println("Printing current internal line");
-            List<String> line = getLine();
+        TokenizedLine line = tokenizedLines.get(lineIdx);
 
-            System.err.println(String.join(" ", line));
-        }
-
-        throw new IllegalArgumentException((linesCountModified ? "Internal " : "") +
-                "Line " + (lineIdx + 1) + ": " + message);
+        throw new IllegalArgumentException(line.getSourceFilename() + " at line " +
+                line.getOriginalLineNumber() + ": " + message);
     }
 }

@@ -103,7 +103,7 @@ public class Preprocessor {
             throw new RuntimeException(e);
         }
         for (int i = tokenizedLines.size() - 1; i >= 0; i--) {
-            tokenizedCode.insertFirstLine(tokenizedLines.get(i));
+            tokenizedCode.insertFirstLine(TokenizedLine.of(file.getPath(), i, tokenizedLines.get(i)));
         }
 
         return true;
