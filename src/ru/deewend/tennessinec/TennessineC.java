@@ -299,15 +299,17 @@ public class TennessineC {
         VariableData data;
         variableMap.put(variableName, (data = VariableData.of(recognizedType)));
 
-        if (nextTokenIs(TokenizedCode.TokenType.STATEMENT_END)) return;
+        int value = 0;
+        if (!nextTokenIs(TokenizedCode.TokenType.STATEMENT_END)) {
+            if (!nextToken().equals("=")) {
+                tokenizedLines.issue("expected an assignment");
+            }
+            if (getNextTokenType() != TokenizedCode.TokenType.LITERAL_INTEGER) {
+                tokenizedLines.issue("expected the next token to be an integer (variable value)");
+            }
 
-        if (!nextToken().equals("=")) {
-            tokenizedLines.issue("expected an assignment");
+            value = Integer.parseInt(nextToken());
         }
-        if (getNextTokenType() != TokenizedCode.TokenType.LITERAL_INTEGER) {
-            tokenizedLines.issue("expected the next token to be an integer (variable value)");
-        }
-        int value = Integer.parseInt(nextToken());
 
         data.calculateStackOffset(this);
         recognizedType.push(exporter, value);
@@ -399,11 +401,7 @@ public class TennessineC {
     }
 
     private String nextToken() {
-        return nextToken(false);
-    }
-
-    private String nextToken(boolean tt) {
-        if (!tt) hasMoreTokens();
+        hasMoreTokens();
 
         return tokenizedLines.nextToken();
     }

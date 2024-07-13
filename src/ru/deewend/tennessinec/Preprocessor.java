@@ -156,9 +156,26 @@ public class Preprocessor {
         Metadata metadata = compiler.metadata;
         switch (secondOption) {
             case "subsystem": {
-                if (!value.equals("gui")) tokenizedCode.issue("Subsystems other than \"gui\" are currently unsupported");
+                int subsystem = 0;
+                switch (value) {
+                    case "gui": {
+                        subsystem = 2;
 
-                metadata.setSubsystem(2);
+                        break;
+                    }
+                    case "cli": {
+                        subsystem = 3;
+
+                        break;
+                    }
+                    default: {
+                        tokenizedCode.issue("Subsystems other than \"gui\" and \"cli\" are currently unsupported");
+
+                        break;
+                    }
+                }
+
+                metadata.setSubsystem(subsystem);
 
                 break;
             }
