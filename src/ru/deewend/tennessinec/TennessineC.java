@@ -374,9 +374,13 @@ public class TennessineC {
         return method;
     }
 
+    /*
+     * Assuming this is the end of the method.
+     */
     private void addExitProcess() {
         exporter.putInstruction("PushByte", 0);
         exporter.putInstruction("CallMethod", "ExitProcess");
+        exporter.putInstruction("FinishMethod", Helper.EMPTY_PARAMETER);
     }
 
     private boolean nextTokenIs(TokenizedCode.TokenType type) {

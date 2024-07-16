@@ -26,6 +26,7 @@ public class WinI386 implements Exporter {
     private final List<byte[]> stringList = new LinkedList<>();
     private final Map<String, Integer> externalMethodAddresses = new HashMap<>();
     private Metadata metadata;
+    private ByteBuffer buffer;
 
     @Override
     public void load(Metadata metadata) {
@@ -251,12 +252,14 @@ public class WinI386 implements Exporter {
 
         Helper.writeNullUntil(buffer, CODE_SECTION_START);
 
+        this.buffer = buffer;
         // it's not replaceable
         //noinspection ForLoopReplaceableByForEach
         for (int i = 0; i < instructionList.size(); i++) {
             Instruction instruction = instructionList.get(i);
             instruction.encode(buffer);
         }
+        this.buffer = null;
         checkOverflow(buffer.position() - CODE_SECTION_START);
 
         Helper.writeNullUntil(buffer, IMPORTS_SECTION_START);
@@ -302,6 +305,18 @@ public class WinI386 implements Exporter {
         }
 
         instructionList.add(instruction);
+    }
+
+    @Override
+    public void encodeLastInstruction() {
+        if (buffer == null) {
+            throw new IllegalStateException("Instruction encoding hasn't started or already finished");
+        }
+
+        int idx = instructionList.size() - 1;
+        Instruction instruction = instructionList.get(idx);
+        instruction.encode(buffer);
+        instructionList.remove(idx);
     }
 
     @Override

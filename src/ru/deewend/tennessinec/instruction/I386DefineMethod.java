@@ -7,6 +7,7 @@ import ru.deewend.tennessinec.exporter.Exporter;
 
 import java.nio.ByteBuffer;
 
+@NotARealMachineInstruction
 public class I386DefineMethod implements Instruction {
     private final Exporter exporter;
     private final int stackSize;
