@@ -347,7 +347,7 @@ public class TennessineC {
         }
         //}
 
-        exporter.putInstruction("CallExternalMethod", method.getName());
+        exporter.putInstruction("CallMethod", method.getName());
     }
 
     private ExternalMethod lookupExternalMethod(String name) {
@@ -374,7 +374,7 @@ public class TennessineC {
 
     private void addExitProcess() {
         exporter.putInstruction("PushByte", 0);
-        exporter.putInstruction("CallExternalMethod", "ExitProcess");
+        exporter.putInstruction("CallMethod", "ExitProcess");
     }
 
     private boolean nextTokenIs(TokenizedCode.TokenType type) {
