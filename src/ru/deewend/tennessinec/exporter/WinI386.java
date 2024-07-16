@@ -251,7 +251,12 @@ public class WinI386 implements Exporter {
 
         Helper.writeNullUntil(buffer, CODE_SECTION_START);
 
-        for (Instruction instruction : instructionList) instruction.encode(buffer);
+        // it's not replaceable
+        //noinspection ForLoopReplaceableByForEach
+        for (int i = 0; i < instructionList.size(); i++) {
+            Instruction instruction = instructionList.get(i);
+            instruction.encode(buffer);
+        }
         checkOverflow(buffer.position() - CODE_SECTION_START);
 
         Helper.writeNullUntil(buffer, IMPORTS_SECTION_START);
@@ -293,7 +298,7 @@ public class WinI386 implements Exporter {
 
             instruction = (Instruction) constructor.newInstance(this, parameter);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Adding " + name + " instruction with parameter " + parameter, e);
         }
 
         instructionList.add(instruction);

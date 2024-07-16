@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class Helper {
+    public static final Object EMPTY_PARAMETER = new Object();
     public static final int SKIP_PARAMETER = Integer.MAX_VALUE;
 
     private static final Map<String, Exporter> EXPORTER_CACHE = new HashMap<>();

@@ -259,6 +259,8 @@ public class TennessineC {
                 if (!nextToken().equals("{")) tokenizedLines.issue("expected an opening curly brace");
                 if (methodCount > 0) tokenizedLines.issue("defining multiple methods is currently unsupported");
 
+                exporter.putInstruction("DefineMethod", 16);
+
                 insideAMethod = true;
             }
             boolean symbol = nextTokenIs(TokenizedCode.TokenType.SYMBOL);

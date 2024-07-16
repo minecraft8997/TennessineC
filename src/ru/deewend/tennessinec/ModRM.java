@@ -44,12 +44,16 @@ public class ModRM {
         return this;
     }
 
-    public byte value() {
+    public int value() {
         int result = 0;
         result |= (mod << 6);
         result |= (reg << 3);
         result |= rm;
 
-        return (byte) result;
+        return result;
+    }
+
+    public byte byteValue() {
+        return (byte) value();
     }
 }

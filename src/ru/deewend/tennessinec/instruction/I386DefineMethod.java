@@ -1,5 +1,6 @@
 package ru.deewend.tennessinec.instruction;
 
+import ru.deewend.tennessinec.Helper;
 import ru.deewend.tennessinec.ModRM;
 import ru.deewend.tennessinec.Pair;
 import ru.deewend.tennessinec.exporter.Exporter;
@@ -17,13 +18,13 @@ public class I386DefineMethod implements Instruction {
 
     @Override
     public void encode(ByteBuffer buffer) {
-        exporter.putInstruction("I386PushEBP", null);
-        exporter.putInstruction("I386Mov", ModRM.builder()
+        exporter.putInstruction("PushEBP", Helper.EMPTY_PARAMETER);
+        exporter.putInstruction("Mov", Pair.of(ModRM.builder()
                 .setMod(ModRM.MOD_REGISTER_TO_REGISTER)
                 .setReg(ModRM.REG_EBP)
                 .setRm(ModRM.REG_ESP)
-                .value()); // MOV EBP,ESP
-        exporter.putInstruction("I386Sub", Pair.of(ModRM.builder()
+                .value(), Helper.SKIP_PARAMETER)); // MOV EBP,ESP
+        exporter.putInstruction("Sub", Pair.of(ModRM.builder()
                 .setMod(ModRM.MOD_REGISTER_TO_REGISTER)
                 .setReg(ModRM.REG_ESP)
                 .setRm(ModRM.RM_CONSTANT)
