@@ -316,7 +316,7 @@ public class TennessineC {
     }
 
     private void handleMethodCall(String nextToken) {
-        ExternalMethod method = lookupExternalMethod(nextToken);
+        TMethod method = lookupExternalMethod(nextToken);
         List<String> parameterTypes = method.getParameterTypes();
 
         //if (!parameterTypes.isEmpty()) {
@@ -350,14 +350,14 @@ public class TennessineC {
         exporter.putInstruction("CallMethod", method.getName());
     }
 
-    private ExternalMethod lookupExternalMethod(String name) {
-        Set<Pair<LibraryName, Set<ExternalMethod>>> importsSet = metadata.importsSet();
+    private TMethod lookupExternalMethod(String name) {
+        Set<Pair<LibraryName, Set<TMethod>>> importsSet = metadata.importsSet();
 
-        ExternalMethod method = null;
-        for (Pair<LibraryName, Set<ExternalMethod>> pair : importsSet) {
-            Set<ExternalMethod> externalMethods = pair.getSecond();
+        TMethod method = null;
+        for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
+            Set<TMethod> externalMethods = pair.getSecond();
 
-            for (ExternalMethod externalMethod : externalMethods) {
+            for (TMethod externalMethod : externalMethods) {
                 if (externalMethod.getName().equals(name)) {
                     if (method != null) {
                         tokenizedLines.issue("While searching for definition of external method \"" + name + "\" " +

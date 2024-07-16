@@ -9,6 +9,6 @@ public interface Exporter {
     void export(ByteBuffer stream);
     int mountString(String str);
     void putInstruction(String name, Object parameter);
-    int getExternalMethodVirtualAddress(String name);
+    int getMethodVirtualAddress(String name);
     int imageSize();
 }

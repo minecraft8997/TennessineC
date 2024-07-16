@@ -3,7 +3,7 @@ package ru.deewend.tennessinec;
 import java.util.*;
 
 public class Metadata {
-    private Map<LibraryName, Set<ExternalMethod>> imports = new HashMap<>();
+    private Map<LibraryName, Set<TMethod>> imports = new HashMap<>();
     private boolean finishedConstructingImports;
     private int fileCount;
     private int minNTVersion = 4;
@@ -14,7 +14,7 @@ public class Metadata {
         if (!imports.containsKey(libraryName)) {
             imports.put(libraryName, new HashSet<>());
         }
-        imports.get(libraryName).add(ExternalMethod.of(functionName, parameterTypes));
+        imports.get(libraryName).add(TMethod.of(functionName, parameterTypes));
     }
 
     public void finishConstructingImports() {
@@ -22,11 +22,11 @@ public class Metadata {
         finishedConstructingImports = true;
     }
 
-    public Set<Pair<LibraryName, Set<ExternalMethod>>> importsSet() {
+    public Set<Pair<LibraryName, Set<TMethod>>> importsSet() {
         if (!finishedConstructingImports) throw new IllegalStateException();
 
-        Set<Pair<LibraryName, Set<ExternalMethod>>> result = new HashSet<>();
-        for (Map.Entry<LibraryName, Set<ExternalMethod>> data : imports.entrySet()) {
+        Set<Pair<LibraryName, Set<TMethod>>> result = new HashSet<>();
+        for (Map.Entry<LibraryName, Set<TMethod>> data : imports.entrySet()) {
             result.add(Pair.of(data.getKey(), Collections.unmodifiableSet(data.getValue())));
         }
 

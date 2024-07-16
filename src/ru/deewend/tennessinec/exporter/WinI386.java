@@ -144,13 +144,13 @@ public class WinI386 implements Exporter {
 
         // imports
 
-        Set<Pair<LibraryName, Set<ExternalMethod>>> importsSet = metadata.importsSet();
+        Set<Pair<LibraryName, Set<TMethod>>> importsSet = metadata.importsSet();
         int methodCount = 0;
         int methodsLength = 0;
-        for (Pair<LibraryName, Set<ExternalMethod>> pair : importsSet) {
-            Set<ExternalMethod> externalMethods = pair.getSecond();
+        for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
+            Set<TMethod> externalMethods = pair.getSecond();
             methodCount += externalMethods.size();
-            for (ExternalMethod method : externalMethods) {
+            for (TMethod method : externalMethods) {
                 methodsLength += 2 + method.getName().length() + 1; // check encoding?
             }
         }
@@ -159,7 +159,7 @@ public class WinI386 implements Exporter {
         sectionSize += methodPointersLength;
         sectionSize += methodsLength;
         sectionSize += methodPointersLength;
-        for (Pair<LibraryName, Set<ExternalMethod>> pair : importsSet) {
+        for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
             LibraryName name = pair.getFirst();
             sectionSize += name.getName().length() + 1; // null terminator
         }
@@ -168,7 +168,7 @@ public class WinI386 implements Exporter {
 
         int currentPointer = sectionSize;
         Map<LibraryName, Integer> libraryNamePointers = new HashMap<>();
-        for (Pair<LibraryName, Set<ExternalMethod>> pair : importsSet) {
+        for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
             LibraryName name = pair.getFirst();
             String uppercaseName = name.getUppercaseName();
             byte[] bytes = (uppercaseName + "\0").getBytes(StandardCharsets.US_ASCII);
@@ -183,16 +183,16 @@ public class WinI386 implements Exporter {
         currentPointer -= methodPointersLength; // we'll fill it later
         int thePointer0 = currentPointer;
 
-        Map<Pair<LibraryName, ExternalMethod>, Integer> methodNamePointers = new HashMap<>();
+        Map<Pair<LibraryName, TMethod>, Integer> methodNamePointers = new HashMap<>();
         boolean firstTime = true;
         int end = 0;
         int start = 0;
         int methodsWritten = 0;
         int pointerToCurrentPointerToMethodName = currentPointer - methodsLength - 8;
-        for (Pair<LibraryName, Set<ExternalMethod>> pair : importsSet) {
+        for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
             LibraryName libraryName = pair.getFirst();
 
-            for (ExternalMethod method : pair.getSecond()) {
+            for (TMethod method : pair.getSecond()) {
                 String name = method.getName();
                 //               hint
                 byte[] bytes = ("\0\0" + name + "\0").getBytes(StandardCharsets.US_ASCII);
@@ -220,10 +220,10 @@ public class WinI386 implements Exporter {
         }
         importsBuffer.position(0);
 
-        for (Pair<LibraryName, Set<ExternalMethod>> pair : importsSet) {
+        for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
             LibraryName libraryName = pair.getFirst();
 
-            for (ExternalMethod method : pair.getSecond()) {
+            for (TMethod method : pair.getSecond()) {
                 int pointer1 = IMPORTS_VA + methodNamePointers.get(Pair.of(libraryName, method));
                 int pointerToLibraryName = IMPORTS_VA + libraryNamePointers.get(libraryName);
                 int pointer2 = pointer1 + methodsLength + methodPointersLength;
@@ -300,7 +300,7 @@ public class WinI386 implements Exporter {
     }
 
     @Override
-    public int getExternalMethodVirtualAddress(String name) {
+    public int getMethodVirtualAddress(String name) {
         Integer virtualAddress = externalMethodAddresses.get(name);
         if (virtualAddress == null) throw new IllegalArgumentException("Unknown method");
 

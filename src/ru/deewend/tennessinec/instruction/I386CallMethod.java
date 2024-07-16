@@ -16,6 +16,6 @@ public class I386CallMethod implements Instruction {
     @Override
     public void encode(ByteBuffer buffer) {
         buffer.putShort((short) 0x15FF);
-        buffer.putInt(exporter.getExternalMethodVirtualAddress(methodName));
+        buffer.putInt(exporter.getMethodVirtualAddress(methodName));
     }
 }

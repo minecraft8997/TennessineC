@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class ExternalMethod {
+public class TMethod {
     /*
     public interface Encoder {
         int encode(Exporter exporter);
@@ -30,7 +30,7 @@ public class ExternalMethod {
     private final String name;
     private final List<String> parameterTypes;
 
-    private ExternalMethod(String name, List<String> parameterTypes) {
+    private TMethod(String name, List<String> parameterTypes) {
         this.name = name;
         this.parameterTypes = new ArrayList<>(parameterTypes);
         for (String parameterType : parameterTypes) {
@@ -40,8 +40,8 @@ public class ExternalMethod {
         }
     }
 
-    public static ExternalMethod of(String name, List<String> parameterTypes) {
-        return new ExternalMethod(name, parameterTypes);
+    public static TMethod of(String name, List<String> parameterTypes) {
+        return new TMethod(name, parameterTypes);
     }
 
     public String getName() {
