@@ -19,8 +19,11 @@ public class Helper {
     private Helper() {
     }
 
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-    public static boolean validateToken(String token) {
+    public static void validateToken(String token) {
+        validateToken(token, true);
+    }
+
+    public static boolean validateToken(String token, boolean throwException) {
         if (token.isEmpty()) {
             return false;
         }
@@ -35,6 +38,8 @@ public class Helper {
             if ((current >= 'a' && current <= 'z') || (current >= 'A' && current <= 'Z')) {
                 continue;
             }
+
+            if (throwException) throw new IllegalArgumentException("Bad token: " + token);
 
             return false;
         }
@@ -91,8 +96,10 @@ public class Helper {
     }
 
     @SuppressWarnings("CallToPrintStackTrace")
-    public static Exporter getExporter(String name) {
+    public static Exporter getExporter(String name, boolean shouldValidateName) {
         Objects.requireNonNull(name);
+
+        if (shouldValidateName) Helper.validateToken(name);
 
         if (EXPORTER_CACHE.containsKey(name)) {
             return EXPORTER_CACHE.get(name);

@@ -55,6 +55,7 @@ public class Preprocessor {
             String directive;
             if ((directive = scanDirective(true)) != null) {
                 String newDirective = Helper.uppercaseFirstCharacter(directive);
+                Helper.validateToken(newDirective);
 
                 method = getClass().getDeclaredMethod("do" + newDirective);
             }

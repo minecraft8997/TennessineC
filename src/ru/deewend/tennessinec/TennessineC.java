@@ -20,7 +20,6 @@ public class TennessineC {
     TokenizedCode tokenizedLines;
     Metadata metadata;
     int idx;
-    final Map<String, VariableData> variableMap;
     private final boolean debugPreprocessingResult;
     private final Exporter exporter;
 
@@ -36,7 +35,6 @@ public class TennessineC {
         this.sourceStream = sourceStream;
         this.sourceFilename = sourceFilename;
         this.parentDirectory = parentDirectory;
-        this.variableMap = new HashMap<>();
         this.debugPreprocessingResult = debugPreprocessingResult;
         this.exporter = exporter;
     }
@@ -113,7 +111,7 @@ public class TennessineC {
 
             hasIssues = true;
         }
-        if (!Helper.validateToken(exporter)) {
+        if (!Helper.validateToken(exporter, false)) {
             System.err.println("Bad exporter name");
 
             hasIssues = true;
@@ -137,7 +135,7 @@ public class TennessineC {
         System.out.println("Output file: " + outputFile);
         System.out.println();
 
-        Exporter exporterObj = Helper.getExporter(exporter);
+        Exporter exporterObj = Helper.getExporter(exporter, false);
         if (exporterObj == null) System.exit(-1);
 
         TennessineC compiler;
@@ -241,10 +239,9 @@ public class TennessineC {
         idx = 0;
         tokenizedLines.switchToLine(0);
         int methodCount = 0;
-        boolean insideAMethod = false;
         while (hasMoreTokens()) {
             String nextToken;
-            if (!insideAMethod) {
+            if (Scope.isRootScope()) {
                 nextToken = nextToken();
                 if (!nextToken.equals("int") && !nextToken.equals("void")) {
                     tokenizedLines.issue("unexpected token: " + nextToken);
@@ -259,14 +256,14 @@ public class TennessineC {
                 if (!nextToken().equals("{")) tokenizedLines.issue("expected an opening curly brace");
                 if (methodCount > 0) tokenizedLines.issue("defining multiple methods is currently unsupported");
 
-                exporter.putInstruction("DefineMethod", 16);
+                exporter.putInstruction("DefineMethod", Scope.METHOD_STACK_SIZE);
 
-                insideAMethod = true;
+                Scope.pushScope();
             }
             boolean symbol = nextTokenIs(TokenizedCode.TokenType.SYMBOL);
             nextToken = nextToken();
             if (nextToken.equals("}")) {
-                insideAMethod = false;
+                Scope.popScope();
                 methodCount++;
 
                 continue;
@@ -299,22 +296,27 @@ public class TennessineC {
         }
         String variableName = nextToken();
         VariableData data;
-        variableMap.put(variableName, (data = VariableData.of(recognizedType)));
+        Scope.addVariable(variableName, (data = VariableData.of(recognizedType)));
 
-        int value = 0;
-        if (!nextTokenIs(TokenizedCode.TokenType.STATEMENT_END)) {
-            if (!nextToken().equals("=")) {
-                tokenizedLines.issue("expected an assignment");
-            }
-            if (getNextTokenType() != TokenizedCode.TokenType.LITERAL_INTEGER) {
-                tokenizedLines.issue("expected the next token to be an integer (variable value)");
-            }
-
-            value = Integer.parseInt(nextToken());
+        boolean noValue;
+        if (!(noValue = nextTokenIs(TokenizedCode.TokenType.STATEMENT_END)) && !nextToken().equals("=")) {
+            tokenizedLines.issue("expected an assignment");
         }
+        List<String> tokens = new ArrayList<>();
+        if (noValue) {
+            tokens.add("0");
+        } else {
+            while (!nextTokenIs(TokenizedCode.TokenType.STATEMENT_END)) {
+                tokens.add(nextToken());
+            }
+        }
+        ExpressionEngine.parseExpression(exporter, tokens, false);
 
-        data.calculateStackOffset(this);
-        recognizedType.push(exporter, value);
+        exporter.putInstruction("Mov", Pair.of(ModRM.builder()
+                .setMod(ModRM.MOD_1_BYTE_DISPLACEMENT)
+                .setReg(ModRM.REG_EAX)
+                .setRm(0b101) // EBP + disp8 (?)
+                .value(), data.getStackOffset()));
     }
 
     private void handleMethodCall(String nextToken) {

@@ -34,7 +34,7 @@ public class TMethod {
         this.name = name;
         this.parameterTypes = new ArrayList<>(parameterTypes);
         for (String parameterType : parameterTypes) {
-            if (!Helper.validateToken(parameterType)) {
+            if (!Helper.validateToken(parameterType, false)) {
                 throw new IllegalArgumentException("Invalid parameter type: " + parameterType);
             }
         }

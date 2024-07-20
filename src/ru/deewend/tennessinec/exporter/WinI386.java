@@ -294,6 +294,8 @@ public class WinI386 implements Exporter {
 
     @Override
     public void putInstruction(String name, Object parameter) {
+        Helper.validateToken(name);
+
         Instruction instruction;
         try {
             Class<?> clazz = Class.forName("ru.deewend.tennessinec.instruction.I386" + name);
