@@ -53,11 +53,10 @@ public class ExpressionEngine {
             if (currentToken.equals("(")) {
                 List<String> tokensInside = new ArrayList<>();
                 int idx = findClosingBraceIdx(theExpressionTokens, tokensInside, 1);
-                int tokenCount = idx - 1;
 
                 parseExpression(exporter, tokensInside, false);
 
-                theExpressionTokens.subList(0, tokenCount).clear();
+                theExpressionTokens.subList(1, idx + 1).clear();
             } else if (TokenizedCode.TokenType.LITERAL_INTEGER.detect(currentToken)) {
                 int base = 10;
                 if (currentToken.startsWith("0x")) {
@@ -92,6 +91,8 @@ public class ExpressionEngine {
                     }
                     exporter.putInstruction("CallMethod", currentToken);
                     // the return value of the method will be located in the EAX register
+
+                    theExpressionTokens.subList(1, idx + 1).clear();
                 } else {
                     // this is a variable name
 
