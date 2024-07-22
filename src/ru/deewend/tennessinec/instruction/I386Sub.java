@@ -7,6 +7,7 @@ import ru.deewend.tennessinec.exporter.Exporter;
 import java.nio.ByteBuffer;
 
 public class I386Sub implements Instruction {
+    private byte opcode = (byte) 0x81;
     private final int modRM;
     private final int constant;
 
@@ -15,10 +16,14 @@ public class I386Sub implements Instruction {
         this.constant = parameters.getSecond();
     }
 
+    protected void setAdd() {
+        this.opcode = (byte) 0x01;
+    }
+
     @Override
     public void encode(ByteBuffer buffer) {
-        buffer.put((byte) 0x81);
+        buffer.put(opcode);
         buffer.put((byte) modRM);
-        if (constant != Helper.SKIP_PARAMETER) buffer.put((byte) constant);
+        if (constant != Helper.SKIP_PARAMETER) buffer.putInt(constant);
     }
 }

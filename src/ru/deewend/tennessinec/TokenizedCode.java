@@ -16,7 +16,7 @@ public class TokenizedCode {
 
     public enum TokenType {
         SYMBOL((token, firstChar) -> !Character.isDigit(firstChar) && Character.isLetter(firstChar)),
-        LITERAL_INTEGER((token, firstChar) -> Character.isDigit(firstChar)),
+        LITERAL_INTEGER((token, firstChar) -> firstChar >= '0' && firstChar <= '9'),
         LITERAL_STRING((token, firstChar) -> firstChar == '"'),
         LITERAL_CHARACTER((token, firstChar) -> firstChar == '\''),
         OPERATOR_MATH(((token, firstChar) -> "+-/*".indexOf(firstChar) != -1)),
@@ -34,13 +34,6 @@ public class TokenizedCode {
         }
     }
 
-    /*
-     * TODO Probably worth doing something like List<Triple<String, Integer, List<String>>> where a Triple contains:
-     *  1) String - the source file from where this line was taken;
-     *  2) Integer - the original line number;
-     *  3) List<String> - the line itself (= list of tokens).
-     *  This will allow us not to report an "Internal line" in case of an error, which is literally not helpful at all.
-     */
     private final List<TokenizedLine> tokenizedLines;
     private int lineIdx;
     private int nextTokenIdx;

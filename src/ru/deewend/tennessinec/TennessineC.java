@@ -312,11 +312,7 @@ public class TennessineC {
         }
         ExpressionEngine.parseExpression(exporter, tokens, false);
 
-        exporter.putInstruction("Mov", Pair.of(ModRM.builder()
-                .setMod(ModRM.MOD_1_BYTE_DISPLACEMENT)
-                .setReg(ModRM.REG_EAX)
-                .setRm(0b101) // EBP + disp8 (?)
-                .value(), data.getStackOffset()));
+        Helper.moveFromEAXToMem(exporter, data);
     }
 
     private void handleMethodCall(String nextToken) {
@@ -382,7 +378,7 @@ public class TennessineC {
     private void addExitProcess() {
         exporter.putInstruction("PushByte", 0);
         exporter.putInstruction("CallMethod", "ExitProcess");
-        exporter.putInstruction("FinishMethod", Helper.EMPTY_PARAMETER);
+        exporter.putInstruction("FinishMethod", Helper.NOTHING);
     }
 
     private boolean nextTokenIs(TokenizedCode.TokenType type) {

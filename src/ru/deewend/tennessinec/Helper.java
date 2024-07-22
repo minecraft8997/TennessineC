@@ -11,7 +11,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class Helper {
-    public static final Object EMPTY_PARAMETER = new Object();
+    public enum MovType {
+        REG_TO_REG_OR_REG_TO_MEM,
+        MEM_TO_REG_OR_MEM_TO_MEM
+    }
+
+    public static final Object NOTHING = new Object();
     public static final int SKIP_PARAMETER = Integer.MAX_VALUE;
 
     private static final Map<String, Exporter> EXPORTER_CACHE = new HashMap<>();
@@ -122,6 +127,24 @@ public class Helper {
         EXPORTER_CACHE.put(name, instance);
 
         return instance;
+    }
+
+    private static void moveVariable(Exporter exporter, MovType mode, VariableData data) {
+        exporter.putInstruction("Mov", Triple.of(mode, ModRM.builder()
+                .setMod(ModRM.MOD_1_BYTE_DISPLACEMENT)
+                .setReg(ModRM.REG_EAX)
+                .setRm(0b101) // EBP + disp8 (?)
+                .value(), data.getStackOffset()));
+    }
+
+    public static void moveFromEAXToMem(Exporter exporter, VariableData data) {
+        // MOV dword ptr [EBP + stackOffset],EAX
+        moveVariable(exporter, MovType.REG_TO_REG_OR_REG_TO_MEM, data);
+    }
+
+    public static void moveFromMemToEAX(Exporter exporter, VariableData data) {
+        // MOV EAX,dword ptr [EBP + stackOffset]
+        moveVariable(exporter, MovType.MEM_TO_REG_OR_MEM_TO_MEM, data);
     }
 
     public static void putString(ByteBuffer buffer, String str) {
