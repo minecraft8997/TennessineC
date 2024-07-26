@@ -18,11 +18,10 @@ public class Tokenizer {
         return INSTANCE;
     }
 
-    /*
-    public List<String> tokenizeLine() {
-        return tokenizeLine(compiler.sourceLines.get(compiler.idx));
+    private static boolean isLetterOrDigit(char symbol) {
+        return (symbol >= 'a' && symbol <= 'z') ||
+                (symbol >= 'A' && symbol <= 'Z') || (symbol >= '0' && symbol <= '9');
     }
-     */
 
     public List<String> tokenizeLine(String originalLine, int lineNumber) {
         this.line = originalLine;
@@ -36,10 +35,10 @@ public class Tokenizer {
 
             token = null;
             char firstSymbol = line.charAt(0);
-            if (Character.isLetterOrDigit(firstSymbol)) {
+            if (isLetterOrDigit(firstSymbol)) {
                 for (i = 1; i < line.length(); i++) {
                     char currentChar = line.charAt(i);
-                    if (!Character.isLetterOrDigit(line.charAt(i)) && currentChar != '_') break;
+                    if (!isLetterOrDigit(line.charAt(i)) && currentChar != '_') break;
                 }
                 i--;
                 token();
@@ -71,7 +70,12 @@ public class Tokenizer {
                 if (closingSymbol != '\'') issue(badEnding);
 
                 token();
-            } else if ("#(){}+-/*,;=\\".indexOf(firstSymbol) != -1) { // todo implement support of <> (#include <something>)
+            } else if (firstSymbol == '.' && line.length() >= 3 && line.charAt(1) == '.' && line.charAt(2) == '.') {
+                // vararg
+                i = 2;
+                token();
+            } else if ("#(){}+-/*.,;=\\".indexOf(firstSymbol) != -1) {
+                // todo implement support of <> (#include <something>)
                 i = 0;
                 token(); // instead of token = String.valueOf(firstSymbol); line = line.substring(1);
             } else {

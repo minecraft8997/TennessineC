@@ -2,7 +2,7 @@
 
 #pragma tenc subsystem gui
 #pragma tenc minNTVersion 4
-#pragma tenc import("user32.dll", "MessageBoxA", byte, pointer, pointer, byte)
+#pragma tenc import("user32.dll", int, "MessageBoxA", byte, pointer, pointer, byte)
 
 // #pragma tenc bundleFile("./myImage.png", 0) // to be implemented
 

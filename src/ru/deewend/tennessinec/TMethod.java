@@ -5,28 +5,6 @@ import java.util.Collections;
 import java.util.List;
 
 public class TMethod {
-    /*
-    public interface Encoder {
-        int encode(Exporter exporter);
-    }
-
-    public enum Type {
-        BYTE,
-        POINTER;
-
-        private final Encoder size;
-        private final Encoder pushEncoder;
-
-        Type(Encoder pushEncoder) {
-            this.pushEncoder = pushEncoder;
-        }
-
-        public int getPushInstruction(Exporter exporter) {
-            return pushEncoder.encode(exporter);
-        }
-    }
-     */
-
     private final String name;
     private final List<String> parameterTypes;
 

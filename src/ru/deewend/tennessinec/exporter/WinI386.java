@@ -171,7 +171,7 @@ public class WinI386 implements Exporter {
         Map<LibraryName, Integer> libraryNamePointers = new HashMap<>();
         for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
             LibraryName name = pair.getFirst();
-            String uppercaseName = name.getUppercaseName();
+            String uppercaseName = name.defaultCase();
             byte[] bytes = (uppercaseName + "\0").getBytes(StandardCharsets.US_ASCII);
             int length = bytes.length;
 

@@ -20,7 +20,7 @@ public class TokenizedCode {
         LITERAL_STRING((token, firstChar) -> firstChar == '"'),
         LITERAL_CHARACTER((token, firstChar) -> firstChar == '\''),
         OPERATOR_MATH(((token, firstChar) -> "+-/*".indexOf(firstChar) != -1)),
-        OTHER((token, firstChar) -> "#(){},=\\".indexOf(firstChar) != -1),
+        OTHER((token, firstChar) -> "#(){}.,=\\".indexOf(firstChar) != -1),
         STATEMENT_END((token, firstChar) -> firstChar == ';');
 
         private final Detector detector;
@@ -42,7 +42,7 @@ public class TokenizedCode {
         this.tokenizedLines = new ArrayList<>(tokenizedLines.size());
         for (int i = 0; i < tokenizedLines.size(); i++) {
             List<String> line = tokenizedLines.get(i);
-            this.tokenizedLines.add(TokenizedLine.of(sourceFilename, (i + 1), line));
+            this.tokenizedLines.add(TokenizedLine.of(sourceFilename, i, line));
         }
     }
 

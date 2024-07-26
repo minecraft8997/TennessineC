@@ -131,20 +131,41 @@ public class Preprocessor {
                 tokenizedCode.issue("expected a string literal (library name)");
             }
             String libraryName = Helper.stringTokenToString(tokenizedCode.nextToken());
+            if (tokenizedCode.getNextTokenTypeOmitComma(true) != TokenizedCode.TokenType.SYMBOL) {
+                tokenizedCode.issue("expected a symbol (external method return type)");
+            }
+            String returnTypeRaw = tokenizedCode.nextToken();
+            DataType returnType = DataType.recognizeDataType(returnTypeRaw);
+            if (returnType == null) {
+                tokenizedCode.issue("unrecognized data type: " + returnTypeRaw);
+            }
             if (tokenizedCode.getNextTokenTypeOmitComma(true) != TokenizedCode.TokenType.LITERAL_STRING) {
-                tokenizedCode.issue("expected a string literal (method name)");
+                tokenizedCode.issue("expected a string literal (external method name)");
             }
             String methodName = Helper.stringTokenToString(tokenizedCode.nextToken());
             List<String> types = new ArrayList<>();
 
-            while (tokenizedCode.getNextTokenTypeOmitComma(false) == TokenizedCode.TokenType.SYMBOL) {
-                types.add(tokenizedCode.nextToken());
+            boolean hasVararg = false;
+            TokenizedCode.TokenType nextTokenType;
+            while (
+                    (nextTokenType = tokenizedCode.getNextTokenTypeOmitComma(false)) ==
+                            TokenizedCode.TokenType.SYMBOL || nextTokenType == TokenizedCode.TokenType.OTHER
+            ) {
+                if (checkClosingBrace()) break;
+                if (hasVararg) {
+                    tokenizedCode.issue("noticed a symbol (data type) after the vararg token (\"...\")");
+                }
+                String token = tokenizedCode.nextToken();
+                if (nextTokenType != TokenizedCode.TokenType.SYMBOL && !(hasVararg = token.equals("..."))) {
+                    tokenizedCode.issue("unexpected token: " + token);
+                }
+                if (!hasVararg) types.add(token);
             }
-            if (!tokenizedCode.currentToken().equals(")")) tokenizedCode.issue("bad import syntax");
+            if (!checkClosingBrace()) tokenizedCode.issue("bad import syntax");
 
             tokenizedCode.removeLine(compiler.idx);
 
-            compiler.metadata.addImport(libraryName, methodName, types);
+            compiler.metadata.addImport(libraryName, returnType, methodName, types);
 
             return true;
         }
@@ -193,6 +214,10 @@ public class Preprocessor {
         }
 
         return true;
+    }
+
+    private boolean checkClosingBrace() {
+        return tokenizedCode.currentToken().equals(")");
     }
 
     @SuppressWarnings({"unchecked", "unused"})

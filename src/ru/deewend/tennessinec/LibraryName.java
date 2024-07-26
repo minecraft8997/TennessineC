@@ -4,11 +4,11 @@ import java.util.Objects;
 
 public final class LibraryName {
     private final String name;
-    private final String uppercaseName;
+    private final String lowercaseName;
 
     private LibraryName(String name) {
         this.name = name;
-        uppercaseName = name.toUpperCase();
+        lowercaseName = name.toLowerCase();
     }
 
     public static LibraryName of(String name) {
@@ -19,8 +19,8 @@ public final class LibraryName {
         return name;
     }
 
-    public String getUppercaseName() {
-        return uppercaseName;
+    public String defaultCase() {
+        return lowercaseName;
     }
 
     @Override
@@ -29,11 +29,11 @@ public final class LibraryName {
         if (o == null || getClass() != o.getClass()) return false;
         LibraryName that = (LibraryName) o;
 
-        return Objects.equals(uppercaseName, that.uppercaseName);
+        return Objects.equals(lowercaseName, that.lowercaseName);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(uppercaseName);
+        return Objects.hash(lowercaseName);
     }
 }

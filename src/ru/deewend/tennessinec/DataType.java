@@ -1,18 +1,24 @@
 package ru.deewend.tennessinec;
 
-import ru.deewend.tennessinec.exporter.Exporter;
-
 public enum DataType {
-    CHAR("char", 1), INT("int", 4);
+    VOID("void", 0, false),
+    CHAR("char", 1),
+    INT("int", 4);
 
     private final String name;
-    private final String nameFirstCharacterUppercased;
+    // private final String nameFirstCharacterUppercased;
     private final int size;
+    private final boolean canBeUsedForVariableDefinition;
 
     DataType(String name, int size) {
+        this(name, size, true);
+    }
+
+    DataType(String name, int size, boolean canBeUsedForVariableDefinition) {
         this.name = name;
-        this.nameFirstCharacterUppercased = Helper.uppercaseFirstCharacter(name);
+        // this.nameFirstCharacterUppercased = Helper.uppercaseFirstCharacter(name);
         this.size = size;
+        this.canBeUsedForVariableDefinition = canBeUsedForVariableDefinition;
     }
 
     public static DataType recognizeDataType(String token) {
@@ -31,7 +37,7 @@ public enum DataType {
         return size;
     }
 
-    public void push(Exporter exporter, Object value) {
-        exporter.putInstruction("Push" + nameFirstCharacterUppercased, value);
+    public boolean canBeUsedForVariableDefinition() {
+        return canBeUsedForVariableDefinition;
     }
 }

@@ -9,14 +9,33 @@ public class ExpressionEngine {
     private static final byte STAGE_EXPECTING_OPERATOR = 1;
     private static final byte STAGE_EXPECTING_SECOND_OPERAND = 2;
 
+    private static TennessineC compiler;
+
     private ExpressionEngine() {
+    }
+
+    public static void linkCompiler(TennessineC compiler) {
+        ExpressionEngine.compiler = compiler;
+    }
+
+    public static void parseExpression(
+            Exporter exporter, List<String> theExpressionTokens, boolean shouldInstantiateNewList
+    ) {
+        try {
+            parseExpression0(exporter, theExpressionTokens, shouldInstantiateNewList);
+        } catch (RuntimeException e) {
+            //noinspection CallToPrintStackTrace
+            e.printStackTrace();
+
+            compiler.tokenizedLines.issue(e.getMessage());
+        }
     }
 
     /*
      * Generates instructions calculating the given expression value.
      * Moves the result to EAX register.
      */
-    public static void parseExpression(
+    private static void parseExpression0(
             Exporter exporter, List<String> theExpressionTokens, boolean shouldInstantiateNewList
     ) {
         if (theExpressionTokens.isEmpty()) {
@@ -54,9 +73,9 @@ public class ExpressionEngine {
                 List<String> tokensInside = new ArrayList<>();
                 int idx = findClosingBraceIdx(theExpressionTokens, tokensInside, 1);
 
-                parseExpression(exporter, tokensInside, false);
+                parseExpression0(exporter, tokensInside, false);
 
-                theExpressionTokens.subList(1, idx + 1).clear();
+                theExpressionTokens.subList(1, idx + 1).clear(); // keep at least one token, it will be auto-removed
             } else if (TokenizedCode.TokenType.LITERAL_INTEGER.detect(currentToken)) {
                 int base = 10;
                 if (currentToken.startsWith("0x")) {
@@ -83,7 +102,7 @@ public class ExpressionEngine {
                             tokensInside.add(token);
                         }
                         // the result should be located in the EAX register
-                        parseExpression(exporter, tokensInside, false);
+                        parseExpression0(exporter, tokensInside, false);
 
                         exporter.putInstruction("PushEAX", Helper.NOTHING);
 

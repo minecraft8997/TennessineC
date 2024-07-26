@@ -195,7 +195,7 @@ public class TennessineC {
             }
             idx = (shouldReset ? 0 : idx + 1);
         }
-        metadata.addImport("kernel32.dll", "ExitProcess", Collections.singletonList("byte"));
+        metadata.addImport("kernel32.dll", DataType.VOID, "ExitProcess", Collections.singletonList("byte"));
         metadata.finishConstructingImports();
 
         if (debugPreprocessingResult) {
@@ -229,6 +229,8 @@ public class TennessineC {
     }
 
     public void compile() {
+        ExpressionEngine.linkCompiler(this);
+
         if (tokenizedLines.linesCount() == 0) {
             addExitProcess();
 
@@ -271,6 +273,10 @@ public class TennessineC {
             DataType type = DataType.recognizeDataType(nextToken);
 
             if (type != null) {
+                if (!type.canBeUsedForVariableDefinition()) {
+                    tokenizedLines.issue("type " + type + " cannot be used for variable definition");
+                }
+
                 handleVariableDefinition(type);
             } else {
                 if (!nextToken().equals("(")) {

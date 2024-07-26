@@ -9,7 +9,7 @@ public class Metadata {
     private int minNTVersion = 4;
     private int subsystem = 2; /* gui */
 
-    public void addImport(String library, String functionName, List<String> parameterTypes) {
+    public void addImport(String library, DataType returnType, String functionName, List<String> parameterTypes) {
         LibraryName libraryName = LibraryName.of(library);
         if (!imports.containsKey(libraryName)) {
             imports.put(libraryName, new HashSet<>());
