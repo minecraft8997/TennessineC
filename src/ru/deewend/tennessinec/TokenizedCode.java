@@ -155,9 +155,19 @@ public class TokenizedCode {
     }
 
     public void issue(String message) {
-        TokenizedLine line = tokenizedLines.get(lineIdx);
+        issue(message, false);
+    }
 
-        throw new IllegalArgumentException(line.getSourceFilename() + " at line " +
-                line.getOriginalLineNumber() + ": " + message);
+    public void issue(String message, boolean fromUncaughtExceptionHandler) {
+        TokenizedLine line = tokenizedLines.get(lineIdx);
+        String errorMessage = line.getSourceFilename() + " at line " + line.getOriginalLineNumber() + ": " + message;
+
+        if (fromUncaughtExceptionHandler) {
+            System.err.println(errorMessage);
+
+            return;
+        }
+
+        throw new IllegalArgumentException(errorMessage);
     }
 }

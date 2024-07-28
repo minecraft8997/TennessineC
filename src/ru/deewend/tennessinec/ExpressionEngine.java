@@ -3,39 +3,21 @@ package ru.deewend.tennessinec;
 import ru.deewend.tennessinec.exporter.Exporter;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class ExpressionEngine {
     private static final byte STAGE_EXPECTING_OPERATOR = 1;
     private static final byte STAGE_EXPECTING_SECOND_OPERAND = 2;
 
-    private static TennessineC compiler;
-
     private ExpressionEngine() {
-    }
-
-    public static void linkCompiler(TennessineC compiler) {
-        ExpressionEngine.compiler = compiler;
-    }
-
-    public static void parseExpression(
-            Exporter exporter, List<String> theExpressionTokens, boolean shouldInstantiateNewList
-    ) {
-        try {
-            parseExpression0(exporter, theExpressionTokens, shouldInstantiateNewList);
-        } catch (RuntimeException e) {
-            //noinspection CallToPrintStackTrace
-            e.printStackTrace();
-
-            compiler.tokenizedLines.issue(e.getMessage());
-        }
     }
 
     /*
      * Generates instructions calculating the given expression value.
      * Moves the result to EAX register.
      */
-    private static void parseExpression0(
+    public static void parseExpression(
             Exporter exporter, List<String> theExpressionTokens, boolean shouldInstantiateNewList
     ) {
         if (theExpressionTokens.isEmpty()) {
@@ -65,15 +47,15 @@ public class ExpressionEngine {
             if (stage == STAGE_EXPECTING_SECOND_OPERAND) {
                 exporter.putInstruction("Mov", Triple.of(Helper.MovType.REG_TO_REG_OR_REG_TO_MEM, ModRM.builder()
                         .setMod(ModRM.MOD_REGISTER_TO_REGISTER)
-                        .setReg(ModRM.REG_EBX)
-                        .setRm(ModRM.REG_EAX)
+                        .setReg(ModRM.REG_EAX)
+                        .setRm(ModRM.REG_EBX) // todo wot
                         .value(), Helper.SKIP_PARAMETER)); // MOV EBX,EAX
             }
             if (currentToken.equals("(")) {
                 List<String> tokensInside = new ArrayList<>();
                 int idx = findClosingBraceIdx(theExpressionTokens, tokensInside, 1);
 
-                parseExpression0(exporter, tokensInside, false);
+                parseExpression(exporter, tokensInside, false);
 
                 theExpressionTokens.subList(1, idx + 1).clear(); // keep at least one token, it will be auto-removed
             } else if (TokenizedCode.TokenType.LITERAL_INTEGER.detect(currentToken)) {
@@ -90,25 +72,13 @@ public class ExpressionEngine {
             } else if (TokenizedCode.TokenType.SYMBOL.detect(currentToken)) {
                 if (theExpressionTokens.size() > 1 && theExpressionTokens.get(1).equals("(")) {
                     // this is a method call
+                    Pair<Integer, Integer> result =
+                            parseMethodParameters(exporter, theExpressionTokens, 2);
 
-                    int idx = findClosingBraceIdx(theExpressionTokens, null, 2);
-                    for (int i = idx - 1; i >= 2; i--) {
-                        int j;
-                        List<String> tokensInside = new ArrayList<>();
-                        for (j = i; j >= 2; j--) {
-                            String token = theExpressionTokens.get(i);
-                            if (token.equals(",")) break;
+                    int idx = result.getFirst();
+                    int parameterCount = result.getSecond();
 
-                            tokensInside.add(token);
-                        }
-                        // the result should be located in the EAX register
-                        parseExpression0(exporter, tokensInside, false);
-
-                        exporter.putInstruction("PushEAX", Helper.NOTHING);
-
-                        i = j; // it will be decremented later
-                    }
-                    exporter.putInstruction("CallMethod", currentToken);
+                    TMethod.putCallMethod(exporter, currentToken, parameterCount);
                     // the return value of the method will be located in the EAX register
 
                     theExpressionTokens.subList(1, idx + 1).clear();
@@ -125,14 +95,14 @@ public class ExpressionEngine {
             if (stage == STAGE_EXPECTING_SECOND_OPERAND) {
                 exporter.putInstruction(summation ? "Add" : "Sub", Pair.of(ModRM.builder()
                         .setMod(ModRM.MOD_REGISTER_TO_REGISTER)
-                        .setReg(ModRM.REG_EBX)
-                        .setRm(ModRM.REG_EAX)
+                        .setReg(ModRM.REG_EAX)
+                        .setRm(ModRM.REG_EBX)
                         .value(), Helper.SKIP_PARAMETER)); // ADD/SUB EBX,EAX
 
                 exporter.putInstruction("Mov", Triple.of(Helper.MovType.REG_TO_REG_OR_REG_TO_MEM, ModRM.builder()
                         .setMod(ModRM.MOD_REGISTER_TO_REGISTER)
-                        .setReg(ModRM.REG_EAX)
-                        .setRm(ModRM.REG_EBX)
+                        .setReg(ModRM.REG_EBX)
+                        .setRm(ModRM.REG_EAX)
                         .value(), Helper.SKIP_PARAMETER)); // MOV EAX,EBX
                 // (since we're required to store the result in the EAX register)
 
@@ -148,6 +118,42 @@ public class ExpressionEngine {
         if (!canExitLoop) {
             throw new IllegalArgumentException("Invalid expression: expected an operand");
         }
+    }
+
+    /*
+     * Treats each method parameter as an expression and attempts to parse it.
+     * After the parsing is done, pushes the value of EAX register for each parameter (from right to left).
+     *
+     * The method assumes that theExpressionTokens size is greater than or equal to "startingFrom",
+     * theExpressionTokens.get(startingFrom - 2) is the function name (if presented) and that
+     * theExpressionTokens.get(startingFrom - 1) is "(" -- an opening brace (if presented).
+     */
+    public static Pair<Integer, Integer> parseMethodParameters(
+            Exporter exporter, List<String> theExpressionTokens, int startingFrom
+    ) {
+        int parameterCount = 0;
+        int idx = findClosingBraceIdx(theExpressionTokens, null, startingFrom);
+        for (int i = idx - 1; i >= startingFrom; i--) {
+            int j;
+            List<String> tokensInside = new ArrayList<>();
+            for (j = i; j >= startingFrom; j--) {
+                String token = theExpressionTokens.get(j);
+                if (token.equals(",")) break;
+
+                tokensInside.add(token);
+            }
+            Collections.reverse(tokensInside);
+
+            // the result should be located in the EAX register
+            parseExpression(exporter, tokensInside, false);
+
+            exporter.putInstruction("PushEAX", Helper.NOTHING);
+            parameterCount++;
+
+            i = j; // it will be decremented later
+        }
+
+        return Pair.of(idx, parameterCount);
     }
 
     private static int findClosingBraceIdx(

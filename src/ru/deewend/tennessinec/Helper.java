@@ -73,6 +73,13 @@ public class Helper {
         return token;
     }
 
+    public static <T> List<T> uniformList(int size, T element) {
+        List<T> result = new ArrayList<>(size);
+        for (int i = 0; i < size; i++) result.add(element);
+
+        return result;
+    }
+
     public static List<List<String>> tokenize(InputStream sourceStream) {
         List<String> sourceLines = new ArrayList<>();
         try {

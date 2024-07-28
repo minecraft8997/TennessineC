@@ -143,29 +143,40 @@ public class Preprocessor {
                 tokenizedCode.issue("expected a string literal (external method name)");
             }
             String methodName = Helper.stringTokenToString(tokenizedCode.nextToken());
-            List<String> types = new ArrayList<>();
+            List<DataType> types = new ArrayList<>();
 
-            boolean hasVararg = false;
+            boolean hasVarargs = false;
             TokenizedCode.TokenType nextTokenType;
             while (
                     (nextTokenType = tokenizedCode.getNextTokenTypeOmitComma(false)) ==
                             TokenizedCode.TokenType.SYMBOL || nextTokenType == TokenizedCode.TokenType.OTHER
             ) {
                 if (checkClosingBrace()) break;
-                if (hasVararg) {
-                    tokenizedCode.issue("noticed a symbol (data type) after the vararg token (\"...\")");
+                if (hasVarargs) {
+                    tokenizedCode.issue("noticed a symbol (data type) after the varargs token (\"...\")");
                 }
                 String token = tokenizedCode.nextToken();
-                if (nextTokenType != TokenizedCode.TokenType.SYMBOL && !(hasVararg = token.equals("..."))) {
+                if (nextTokenType != TokenizedCode.TokenType.SYMBOL && !(hasVarargs = token.equals("..."))) {
                     tokenizedCode.issue("unexpected token: " + token);
                 }
-                if (!hasVararg) types.add(token);
+                if (!hasVarargs) {
+                    DataType dataType = DataType.recognizeDataType(token);
+                    if (dataType == null) {
+                        tokenizedCode.issue("unrecognized data type: " + token);
+                    }
+                    //noinspection DataFlowIssue
+                    if (!dataType.canBeUsedForVariableDefinition()) {
+                        tokenizedCode.issue(dataType + " cannot be a parameter type");
+                    }
+
+                    types.add(dataType);
+                }
             }
             if (!checkClosingBrace()) tokenizedCode.issue("bad import syntax");
 
             tokenizedCode.removeLine(compiler.idx);
 
-            compiler.metadata.addImport(libraryName, returnType, methodName, types);
+            compiler.metadata.addImport(libraryName, returnType, methodName, types, hasVarargs);
 
             return true;
         }

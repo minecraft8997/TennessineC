@@ -37,6 +37,7 @@ public enum DataType {
         return size;
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public boolean canBeUsedForVariableDefinition() {
         return canBeUsedForVariableDefinition;
     }

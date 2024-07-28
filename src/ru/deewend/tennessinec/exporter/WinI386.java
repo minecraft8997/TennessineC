@@ -24,7 +24,6 @@ public class WinI386 implements Exporter {
 
     private final List<Instruction> instructionList = new ArrayList<>();
     private final List<byte[]> stringList = new LinkedList<>();
-    private final Map<String, Integer> externalMethodAddresses = new HashMap<>();
     private Metadata metadata;
     private ByteBuffer buffer;
 
@@ -235,9 +234,7 @@ public class WinI386 implements Exporter {
                 importsBuffer.putInt(pointerToLibraryName);
                 importsBuffer.putInt(pointer2);
 
-                // conflicts are possible here, since two different libraries can provide a method with
-                // the same name (?). Note that internal map methodNamePointers is already designed against this issue
-                externalMethodAddresses.put(method.getName(), (IMAGE_BASE + pointer2));
+                method.setVirtualAddress(IMAGE_BASE + pointer2);
             }
         }
         importsBuffer.putInt(0);
@@ -319,14 +316,6 @@ public class WinI386 implements Exporter {
         Instruction instruction = instructionList.get(idx);
         instruction.encode(buffer);
         instructionList.remove(idx);
-    }
-
-    @Override
-    public int getMethodVirtualAddress(String name) {
-        Integer virtualAddress = externalMethodAddresses.get(name);
-        if (virtualAddress == null) throw new IllegalArgumentException("Unknown method");
-
-        return virtualAddress;
     }
 
     @Override

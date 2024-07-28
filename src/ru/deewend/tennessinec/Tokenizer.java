@@ -71,7 +71,7 @@ public class Tokenizer {
 
                 token();
             } else if (firstSymbol == '.' && line.length() >= 3 && line.charAt(1) == '.' && line.charAt(2) == '.') {
-                // vararg
+                // varargs
                 i = 2;
                 token();
             } else if ("#(){}+-/*.,;=\\".indexOf(firstSymbol) != -1) {

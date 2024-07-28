@@ -9,12 +9,14 @@ public class Metadata {
     private int minNTVersion = 4;
     private int subsystem = 2; /* gui */
 
-    public void addImport(String library, DataType returnType, String functionName, List<String> parameterTypes) {
+    public void addImport(
+            String library, DataType returnType, String functionName, List<DataType> parameterTypes, boolean hasVarargs
+    ) {
         LibraryName libraryName = LibraryName.of(library);
         if (!imports.containsKey(libraryName)) {
             imports.put(libraryName, new HashSet<>());
         }
-        imports.get(libraryName).add(TMethod.of(functionName, parameterTypes));
+        imports.get(libraryName).add(TMethod.of(true, returnType, functionName, parameterTypes, hasVarargs));
     }
 
     public void finishConstructingImports() {

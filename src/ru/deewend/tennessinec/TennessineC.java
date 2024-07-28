@@ -6,6 +6,7 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.*;
 
+@SuppressWarnings("CallToPrintStackTrace")
 public class TennessineC {
     public static final int CONTEXT_EXPECTING_SOURCE_FILE = 1;
     public static final int CONTEXT_EXPECTING_DEFINES = 2;
@@ -122,8 +123,8 @@ public class TennessineC {
             hasIssues = true;
         }
         if (hasIssues) {
-            System.err.println("Usage: java -jar TennessineC.jar " +
-                    "-s <sourceFile> [-d [define1] [define2] ...] [-dp] [-e <exporter>] [-bc <bufferCapacity>] -o <outputFile>");
+            System.err.println("Usage: java -jar TennessineC.jar -s <sourceFile> " +
+                    "[-d [define1] [define2] ...] [-dp] [-e <exporter>] [-bc <bufferCapacity>] -o <outputFile>");
 
             System.exit(-1);
         }
@@ -150,7 +151,7 @@ public class TennessineC {
         compiler.preprocess();
 
         compiler.compile();
-        Metadata metadata = compiler.getCompiledCode();
+        Metadata metadata = compiler.getMetadata();
         exporterObj.load(metadata);
 
         ByteBuffer buffer = ByteBuffer.allocate(bufferCapacity);
@@ -172,9 +173,13 @@ public class TennessineC {
         List<List<String>> tokenizedLines = Helper.tokenize(sourceStream);
 
         this.tokenizedLines = TokenizedCode.of(tokenizedLines, sourceFilename);
+        Thread.currentThread().setUncaughtExceptionHandler((t, e) -> {
+            e.printStackTrace();
+
+            this.tokenizedLines.issue(e.getMessage(), true);
+        });
     }
 
-    @SuppressWarnings("CallToPrintStackTrace")
     public void preprocess() {
         /*
          * Instantiating in advance to be able to add imports specified in #pragma tenc import.
@@ -195,7 +200,8 @@ public class TennessineC {
             }
             idx = (shouldReset ? 0 : idx + 1);
         }
-        metadata.addImport("kernel32.dll", DataType.VOID, "ExitProcess", Collections.singletonList("byte"));
+        metadata.addImport("kernel32.dll",
+                DataType.VOID, "ExitProcess", Collections.singletonList(DataType.CHAR), false);
         metadata.finishConstructingImports();
 
         if (debugPreprocessingResult) {
@@ -204,33 +210,11 @@ public class TennessineC {
                 List<String> line = tokenizedLines.getLine();
 
                 System.out.println(String.join(" ", line));
-                /*
-                if (Preprocessor.getInstance().hasFutureAddresses()) {
-                    // assuming the list is sorted in ascending order
-                    List<Integer> futureAddresses = Preprocessor.getInstance().listFutureAddresses();
-                    for (int i = 0; i < line.length(); i++) {
-                        char c;
-                        if (futureAddresses.contains(i)) {
-                            c = '^';
-                        } else {
-                            c = ' ';
-                        }
-                        System.out.print(c);
-                    }
-                    System.out.println();
-                    int firstIdx = futureAddresses.get(0);
-                    for (int i = 0; i < firstIdx; i++) System.out.println(' ');
-
-                    System.out.println("TennessineC will put an address here");
-                }
-                 */
             }
         }
     }
 
     public void compile() {
-        ExpressionEngine.linkCompiler(this);
-
         if (tokenizedLines.linesCount() == 0) {
             addExitProcess();
 
@@ -321,61 +305,20 @@ public class TennessineC {
         Helper.moveFromEAXToMem(exporter, data);
     }
 
-    private void handleMethodCall(String nextToken) {
-        TMethod method = lookupExternalMethod(nextToken);
-        List<String> parameterTypes = method.getParameterTypes();
-
-        //if (!parameterTypes.isEmpty()) {
-        int i = 0;
-        List<Pair<String, Integer>> toPush = new ArrayList<>();
-        while (getNextTokenType() == TokenizedCode.TokenType.LITERAL_INTEGER) {
-            if (i == parameterTypes.size()) tokenizedLines.issue("too many arguments");
-
-            int value = Integer.parseInt(nextToken());
-            String type = Helper.uppercaseFirstCharacter(parameterTypes.get(i++));
-            toPush.add(Pair.of(type, value));
-
-            if (i < parameterTypes.size() && !(nextToken = nextToken()).equals(",")) {
-                tokenizedLines.issue("expected a comma, found: " + nextToken);
-            }
+    private void handleMethodCall(String methodName) {
+        List<String> tokens = new ArrayList<>();
+        while (!nextTokenIs(TokenizedCode.TokenType.STATEMENT_END)) {
+            tokens.add(nextToken());
         }
-        if (i != parameterTypes.size()) tokenizedLines.issue("too few arguments");
-        if (!nextToken().equals(")")) {
-            tokenizedLines.issue("expected a closing brace");
+        Pair<Integer, Integer> result = ExpressionEngine.parseMethodParameters(exporter, tokens, 0);
+        int idx = result.getFirst();
+        if (idx != tokens.size() - 1) {
+            tokenizedLines.issue("unexpected token(s): " +
+                    String.join(", ", tokens.subList(idx + 1, tokens.size())));
         }
-        i--;
-        for (; i >= 0; i--) {
-            Pair<String, Integer> pair = toPush.get(i);
-            String type = pair.getFirst();
-            int value = pair.getSecond();
+        int parameterCount = result.getSecond();
 
-            exporter.putInstruction("Push" + type, value);
-        }
-        //}
-
-        exporter.putInstruction("CallMethod", method.getName());
-    }
-
-    private TMethod lookupExternalMethod(String name) {
-        Set<Pair<LibraryName, Set<TMethod>>> importsSet = metadata.importsSet();
-
-        TMethod method = null;
-        for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
-            Set<TMethod> externalMethods = pair.getSecond();
-
-            for (TMethod externalMethod : externalMethods) {
-                if (externalMethod.getName().equals(name)) {
-                    if (method != null) {
-                        tokenizedLines.issue("While searching for definition of external method \"" + name + "\" " +
-                                "TennessineC has faced with two or more candidates. Method overloading is currently unsupported");
-                    }
-                    method = externalMethod;
-                }
-            }
-        }
-        if (method == null) tokenizedLines.issue("Unable to find method \"" + name + "\"");
-
-        return method;
+        TMethod.putCallMethod(exporter, methodName, parameterCount);
     }
 
     /*
@@ -383,7 +326,7 @@ public class TennessineC {
      */
     private void addExitProcess() {
         exporter.putInstruction("PushByte", 0);
-        exporter.putInstruction("CallMethod", "ExitProcess");
+        exporter.putInstruction("CallMethod", TMethod.lookup("ExitProcess", 1));
         exporter.putInstruction("FinishMethod", Helper.NOTHING);
     }
 
@@ -432,7 +375,7 @@ public class TennessineC {
         }
     }
 
-    public Metadata getCompiledCode() {
+    public Metadata getMetadata() {
         return metadata;
     }
 }

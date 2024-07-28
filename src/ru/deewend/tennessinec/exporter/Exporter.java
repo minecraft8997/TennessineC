@@ -14,6 +14,5 @@ public interface Exporter {
      * being removed from the queue. (We don't want to encode it twice.)
      */
     void encodeLastInstruction();
-    int getMethodVirtualAddress(String name);
     int imageSize();
 }
