@@ -1,6 +1,6 @@
 #pragma tenc subsystem gui
 #pragma tenc minNTVersion 4
-#pragma tenc import("user32.dll", int, "MessageBoxA", char, int, int, char)
+#pragma tenc import("user32.dll", int, "MessageBoxA", int, int, int, int)
 
 void main() {
     int a = 2;

@@ -2,7 +2,7 @@ package ru.deewend.tennessinec;
 
 public enum DataType {
     VOID("void", 0, false),
-    CHAR("char", 1),
+    // CHAR("char", 1),
     INT("int", 4);
 
     private final String name;

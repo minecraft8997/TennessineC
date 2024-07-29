@@ -201,7 +201,7 @@ public class TennessineC {
             idx = (shouldReset ? 0 : idx + 1);
         }
         metadata.addImport("kernel32.dll",
-                DataType.VOID, "ExitProcess", Collections.singletonList(DataType.CHAR), false);
+                DataType.VOID, "ExitProcess", Collections.singletonList(DataType.INT), false);
         metadata.finishConstructingImports();
 
         if (debugPreprocessingResult) {
