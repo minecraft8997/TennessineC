@@ -5,5 +5,5 @@
 void main() {
     int a = 2;
     int pointer = " Hello World!" + 1;
-    MessageBoxA(0, pointer, "[THIS SHOULD NOT APPEAR] TennessineC test" + a + 25 + ((0) - 0), 0);
+    MessageBoxA(0, pointer, "[THIS SHOULD NOT APPEAR] TennessineC test" + a + 23 + ((0) - 0), 0);
 }

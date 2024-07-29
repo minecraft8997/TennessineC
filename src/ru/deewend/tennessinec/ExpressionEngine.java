@@ -29,7 +29,8 @@ public class ExpressionEngine {
         }
 
         byte stage = 0;
-        boolean summation = false;
+        boolean summation = true;
+        boolean shouldMovEBXEAX = true;
         boolean canExitLoop = true;
         while (!theExpressionTokens.isEmpty()) {
             try {
@@ -44,21 +45,39 @@ public class ExpressionEngine {
             }
             // expecting either first or second operand
 
-            if (stage == STAGE_EXPECTING_SECOND_OPERAND) {
+            if (stage == STAGE_EXPECTING_SECOND_OPERAND && shouldMovEBXEAX) {
+                /*
+                 * TODO Something is wrong here.
+                 *
+                 * ModRM class was designed in a way that if in the context of a Mov instruction you put
+                 * .setMod(ModRM.MOD_REGISTER_TO_REGISTER)
+                 * .setReg(REG1)
+                 * .setRm(REG2)
+                 *
+                 * it means you would like to perform MOV REG1,REG2 operation. It works as intended for example
+                 * in I386DefineMethod Instruction (where we perform MOV EBP,ESP), however, to perform
+                 * ADD/SUB/MOV EBX,EAX (and vice-versa) we have to put the registers in a different order.
+                 * Should probably research the reason eventually.
+                 */
                 exporter.putInstruction("Mov", Triple.of(Helper.MovType.REG_TO_REG_OR_REG_TO_MEM, ModRM.builder()
                         .setMod(ModRM.MOD_REGISTER_TO_REGISTER)
                         .setReg(ModRM.REG_EAX)
-                        .setRm(ModRM.REG_EBX) // todo wot
+                        .setRm(ModRM.REG_EBX)
                         .value(), Helper.SKIP_PARAMETER)); // MOV EBX,EAX
+
+                shouldMovEBXEAX = false;
             }
-            if (currentToken.equals("(")) {
-                List<String> tokensInside = new ArrayList<>();
-                int idx = findClosingBraceIdx(theExpressionTokens, tokensInside, 1);
+            while (currentToken.equals("(")) {
+                revealBraces(theExpressionTokens, summation, 1);
 
-                parseExpression(exporter, tokensInside, false);
+                theExpressionTokens.remove(0);
+                if (theExpressionTokens.isEmpty()) {
+                    throw new IllegalArgumentException("Encountered an empty expression");
+                }
+                currentToken = theExpressionTokens.get(0);
+            }
 
-                theExpressionTokens.subList(1, idx + 1).clear(); // keep at least one token, it will be auto-removed
-            } else if (TokenizedCode.TokenType.LITERAL_INTEGER.detect(currentToken)) {
+            if (TokenizedCode.TokenType.LITERAL_INTEGER.detect(currentToken)) {
                 int base = 10;
                 if (currentToken.startsWith("0x")) {
                     base = 16;
@@ -120,6 +139,36 @@ public class ExpressionEngine {
         }
     }
 
+    @SuppressWarnings("SameParameterValue")
+    private static void revealBraces(List<String> theExpressionTokens, boolean summation, int startingFrom) {
+        int stack = 1;
+        for (int i = startingFrom; i < theExpressionTokens.size(); i++) {
+            String currentToken = theExpressionTokens.get(i);
+            if (currentToken.equals("(")) {
+                stack++;
+            } else if (currentToken.equals(")")) {
+                stack--;
+                if (stack == 0) {
+                    theExpressionTokens.remove(i);
+
+                    return;
+                }
+            }
+            if (stack != 1) continue;
+
+            if (summation) continue;
+
+            if (currentToken.equals("+")) {
+                theExpressionTokens.set(i, "-");
+            } else if (currentToken.equals("-")) {
+                theExpressionTokens.set(i, "+");
+            }
+        }
+        if (stack != 0) {
+            throw new IllegalArgumentException("Invalid expression: expected " + stack + " closing brace(s)");
+        }
+    }
+
     /*
      * Treats each method parameter as an expression and attempts to parse it.
      * After the parsing is done, pushes the value of EAX register for each parameter (from right to left).
@@ -156,6 +205,7 @@ public class ExpressionEngine {
         return Pair.of(idx, parameterCount);
     }
 
+    @SuppressWarnings("SameParameterValue")
     private static int findClosingBraceIdx(
             List<String> theExpressionTokens, List<String> tokensInside, int startingFrom
     ) {

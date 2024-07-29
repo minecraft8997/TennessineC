@@ -15,7 +15,7 @@ public class TokenizedCode {
     }
 
     public enum TokenType {
-        SYMBOL((token, firstChar) -> !Character.isDigit(firstChar) && Character.isLetter(firstChar)),
+        SYMBOL((token, firstChar) -> !Tokenizer.isDigit(firstChar) && Tokenizer.isLetter(firstChar)),
         LITERAL_INTEGER((token, firstChar) -> firstChar >= '0' && firstChar <= '9'),
         LITERAL_STRING((token, firstChar) -> firstChar == '"'),
         LITERAL_CHARACTER((token, firstChar) -> firstChar == '\''),

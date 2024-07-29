@@ -216,7 +216,7 @@ public class TennessineC {
 
     public void compile() {
         if (tokenizedLines.linesCount() == 0) {
-            addExitProcess();
+            putExitProcess();
 
             return;
         }
@@ -277,7 +277,7 @@ public class TennessineC {
             if (!(nextToken = nextToken()).equals(";")) tokenizedLines.issue("expected \";\", found: " + nextToken);
         }
 
-        addExitProcess();
+        putExitProcess();
     }
 
     private void handleVariableDefinition(DataType recognizedType) {
@@ -324,9 +324,9 @@ public class TennessineC {
     /*
      * Assuming this is the end of the method.
      */
-    private void addExitProcess() {
+    private void putExitProcess() {
         exporter.putInstruction("PushByte", 0);
-        exporter.putInstruction("CallMethod", TMethod.lookup("ExitProcess", 1));
+        TMethod.putCallMethod(exporter, "ExitProcess", 1);
         exporter.putInstruction("FinishMethod", Helper.NOTHING);
     }
 

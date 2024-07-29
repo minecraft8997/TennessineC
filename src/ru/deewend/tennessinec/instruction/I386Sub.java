@@ -7,7 +7,7 @@ import ru.deewend.tennessinec.exporter.Exporter;
 import java.nio.ByteBuffer;
 
 public class I386Sub implements Instruction {
-    private byte opcode = (byte) 0x81;
+    private boolean add;
     private final int modRM;
     private final int constant;
 
@@ -17,13 +17,28 @@ public class I386Sub implements Instruction {
     }
 
     protected void setAdd() {
-        this.opcode = (byte) 0x01;
+        add = true;
     }
 
     @Override
     public void encode(ByteBuffer buffer) {
-        buffer.put(opcode);
-        buffer.put((byte) modRM);
-        if (constant != Helper.SKIP_PARAMETER) buffer.putInt(constant);
+        boolean hasImmediateValue = (constant != Helper.SKIP_PARAMETER);
+        if (add) {
+            if (hasImmediateValue) {
+                throw new RuntimeException("Instruction Add with an immediate value is currently unsupported");
+            }
+            buffer.put((byte) 0x01);
+            buffer.put((byte) modRM);
+        } else { // sub
+            if (hasImmediateValue) {
+                buffer.put((byte) 0x81);
+            } else {
+                buffer.put((byte) 0x29);
+            }
+            buffer.put((byte) modRM);
+            if (hasImmediateValue) {
+                buffer.putInt(constant);
+            }
+        }
     }
 }

@@ -18,9 +18,16 @@ public class Tokenizer {
         return INSTANCE;
     }
 
+    public static boolean isLetter(char symbol) {
+        return (symbol >= 'a' && symbol <= 'z') || (symbol >= 'A' && symbol <= 'Z');
+    }
+
+    public static boolean isDigit(char symbol) {
+        return (symbol >= '0' && symbol <= '9');
+    }
+
     private static boolean isLetterOrDigit(char symbol) {
-        return (symbol >= 'a' && symbol <= 'z') ||
-                (symbol >= 'A' && symbol <= 'Z') || (symbol >= '0' && symbol <= '9');
+        return isLetter(symbol) || isDigit(symbol);
     }
 
     public List<String> tokenizeLine(String originalLine, int lineNumber) {
