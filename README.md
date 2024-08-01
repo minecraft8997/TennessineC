@@ -1,3 +1,5 @@
+![TennessineC logotype](misc/logotype.png)
+
 # TennessineC
 A small C compiler, written in pure Java, which is able to craft i386 Windows executables.
 
