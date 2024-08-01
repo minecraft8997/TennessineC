@@ -11,7 +11,7 @@ remain a toy compiler.
 ## Obtaining a pre-built binary
 To be documented.
 
-## Compiling `examples/test.c`
+## Compiling [`examples/test.c`](https://github.com/minecraft8997/TennessineC/blob/master/examples/test.c)
 
 Use the following command: `java -jar TennessineC.jar -s examples/test.c -dp -e WinI386 -o test.exe`
 (-dp stands for Debug Preprocessor)

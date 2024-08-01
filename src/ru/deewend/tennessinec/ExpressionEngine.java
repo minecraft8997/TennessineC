@@ -184,12 +184,22 @@ public class ExpressionEngine {
         int idx = findClosingBraceIdx(theExpressionTokens, null, startingFrom);
         for (int i = idx - 1; i >= startingFrom; i--) {
             int j;
+            int stack = 0;
             List<String> tokensInside = new ArrayList<>();
             for (j = i; j >= startingFrom; j--) {
                 String token = theExpressionTokens.get(j);
-                if (token.equals(",")) break;
+                if (token.equals(")")) {
+                    stack++;
+                } else if (token.equals("(")) {
+                    stack--;
+                    if (stack < 0) throw new IllegalArgumentException("Invalid expression: unexpected opening brace");
+                }
+                if (token.equals(",") && stack == 0) break;
 
                 tokensInside.add(token);
+            }
+            if (stack != 0) {
+                throw new IllegalArgumentException("Invalid expression: expected " + stack + " opening brace(s)");
             }
             Collections.reverse(tokensInside);
 

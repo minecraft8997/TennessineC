@@ -5,14 +5,12 @@ import ru.deewend.tennessinec.exporter.Exporter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class TMethod implements Comparable<TMethod> {
+public class TMethod {
     public static final int UNINITIALIZED_VIRTUAL_ADDRESS = 0;
     public static final int UNINITIALIZED_STACK_SIZE = 0;
 
-    private static int NEXT_ID = 0;
     private static final Set<TMethod> KNOWN_METHODS = new HashSet<>();
 
-    private final int id;
     private final boolean external;
     private final DataType returnType;
     private final String name;
@@ -29,7 +27,6 @@ public class TMethod implements Comparable<TMethod> {
         Objects.requireNonNull(parameterTypes);
         for (DataType type : parameterTypes) Objects.requireNonNull(type);
 
-        this.id = NEXT_ID++;
         this.external = external;
         this.returnType = returnType;
         this.name = name;
@@ -52,11 +49,24 @@ public class TMethod implements Comparable<TMethod> {
 
     public static TMethod lookup(String name, int parameterCount) {
         for (TMethod method : KNOWN_METHODS) {
-            if (method.name.equals(name) && method.parameterTypes.size() == parameterCount) return method;
+            if (method.name.equals(name)) {
+                int currentCount = method.parameterTypes.size();
+                if (currentCount == parameterCount || (method.hasVarargs && parameterCount > currentCount)) {
+                    return method;
+                }
+            }
         }
 
         throw new IllegalArgumentException("Could not find a method \"" +
                 name + "\" which parameter count would be equal to " + parameterCount);
+    }
+
+    public static TMethod lookupEntryMethod() {
+        for (TMethod method : KNOWN_METHODS) {
+            if (method.isEntryMethod()) return method;
+        }
+
+        throw new IllegalArgumentException("Could not find the entry method");
     }
 
     public static void putCallMethod(Exporter exporter, String name, int parameterCount) {
@@ -101,16 +111,8 @@ public class TMethod implements Comparable<TMethod> {
         this.stackSize = stackSize;
     }
 
-    /*
-     * TMethod m1 = TMethod.of(...);
-     * TMethod m2 = TMethod.of(...);
-     *
-     * "m1" will have lower id than "m2" but in terms of Comparable semantics
-     * "m1" will be greater than "m2" (because it should be encoded earlier than "m2").
-     */
-    @Override
-    public int compareTo(TMethod o) {
-        return o.id - id;
+    public boolean isEntryMethod() {
+        return name.equals("main") && parameterTypes.isEmpty();
     }
 
     @Override

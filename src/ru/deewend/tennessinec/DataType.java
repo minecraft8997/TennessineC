@@ -6,7 +6,6 @@ public enum DataType {
     INT("int", 4);
 
     private final String name;
-    // private final String nameFirstCharacterUppercased;
     private final int size;
     private final boolean canBeUsedForVariableDefinition;
 
@@ -16,7 +15,6 @@ public enum DataType {
 
     DataType(String name, int size, boolean canBeUsedForVariableDefinition) {
         this.name = name;
-        // this.nameFirstCharacterUppercased = Helper.uppercaseFirstCharacter(name);
         this.size = size;
         this.canBeUsedForVariableDefinition = canBeUsedForVariableDefinition;
     }
@@ -40,5 +38,11 @@ public enum DataType {
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public boolean canBeUsedForVariableDefinition() {
         return canBeUsedForVariableDefinition;
+    }
+
+    public void checkCanBeUsedForVariableDefinition() {
+        if (!canBeUsedForVariableDefinition) {
+            throw new IllegalStateException("type " + this + " cannot be used for variable definition");
+        }
     }
 }

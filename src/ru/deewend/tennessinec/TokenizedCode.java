@@ -76,7 +76,7 @@ public class TokenizedCode {
         if (!(nextToken = nextToken()).equals(",")) {
             if (!strict) return detectTokenType(nextToken);
 
-            issue("expected a comma");
+            issue("expected a comma, found: " + nextToken);
         }
 
         return getNextTokenType();
@@ -154,15 +154,24 @@ public class TokenizedCode {
         return tokenizedLines.size();
     }
 
+    public void warning(String message) {
+        issue(message, false, true);
+    }
+
     public void issue(String message) {
-        issue(message, false);
+        issue(message, false, false);
     }
 
     public void issue(String message, boolean fromUncaughtExceptionHandler) {
+        issue(message, fromUncaughtExceptionHandler, false);
+    }
+
+    public void issue(String message, boolean fromUncaughtExceptionHandler, boolean warning) {
         TokenizedLine line = tokenizedLines.get(lineIdx);
         String errorMessage = line.getSourceFilename() + " at line " + line.getOriginalLineNumber() + ": " + message;
 
-        if (fromUncaughtExceptionHandler) {
+        if (fromUncaughtExceptionHandler || warning) {
+            if (warning) System.err.print("[Warning] ");
             System.err.println(errorMessage);
 
             return;

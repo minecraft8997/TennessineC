@@ -15,6 +15,7 @@ public class WinI386 implements Exporter {
     public static final int SIZE_OF_HEADERS = 0x800;
     public static final int IMPORTS_VA = 0x2000;
     public static final int CODE_SECTION_START = 0x200;
+    public static final int CODE_SECTION_VIRTUAL_ADDRESS = 0x1000;
     public static final int MAX_CODE_BYTES = SIZE_OF_HEADERS;
     public static final int IMPORTS_SECTION_START = CODE_SECTION_START + MAX_CODE_BYTES;
     public static final int MAX_IMPORTS_BYTES = SIZE_OF_HEADERS;
@@ -63,11 +64,11 @@ public class WinI386 implements Exporter {
 
         // Optional header
         buffer.putShort((short) 0x10B); // 32 bit
-        buffer.putShort((short) 0); // padding
+        buffer.putShort((short) 0);
         buffer.putInt(0);
         buffer.putInt(0);
         buffer.putInt(0);
-        buffer.putInt(0x1000); // RVA of entry point
+        buffer.putInt(0x1000); // RVA of entry point (to be modified later)
         buffer.putInt(0); // padding
         buffer.putInt(0);
         buffer.putInt(IMAGE_BASE); // ImageBase
@@ -109,7 +110,7 @@ public class WinI386 implements Exporter {
         buffer.put((byte) 0);
         buffer.put((byte) 0);
         buffer.putInt(0x1000); // VirtualSize
-        buffer.putInt(0x1000); // VirtualAddress
+        buffer.putInt(CODE_SECTION_VIRTUAL_ADDRESS); // VirtualAddress
         buffer.putInt(MAX_CODE_BYTES); // size of raw data
         buffer.putInt(CODE_SECTION_START); // pointer to raw data
         buffer.putInt(0); // padding
@@ -259,6 +260,14 @@ public class WinI386 implements Exporter {
         this.buffer = null;
         checkOverflow(buffer.position() - CODE_SECTION_START);
 
+        TMethod entryMethod = TMethod.lookupEntryMethod();
+        int entryVirtualAddress = entryMethod.getVirtualAddress();
+        if (entryVirtualAddress == TMethod.UNINITIALIZED_VIRTUAL_ADDRESS) {
+            throw new AssertionError("Virtual address of the entry method is uninitialized. " +
+                    "Most likely a compiler bug");
+        }
+        buffer.putInt(0x68 /* 0x58 + 16 bytes */, entryVirtualAddress - IMAGE_BASE);
+
         Helper.writeNullUntil(buffer, IMPORTS_SECTION_START);
 
         checkOverflow(wholeSection.length);
@@ -308,14 +317,27 @@ public class WinI386 implements Exporter {
 
     @Override
     public void encodeLastInstruction() {
-        if (buffer == null) {
-            throw new IllegalStateException("Instruction encoding hasn't started or already finished");
-        }
+        checkBuffer();
 
         int idx = instructionList.size() - 1;
         Instruction instruction = instructionList.get(idx);
         instruction.encode(buffer);
         instructionList.remove(idx);
+    }
+
+    @Override
+    public int currentVirtualAddress() {
+        checkBuffer();
+
+        int offset = buffer.position() - CODE_SECTION_START;
+
+        return IMAGE_BASE + CODE_SECTION_VIRTUAL_ADDRESS + offset;
+    }
+
+    private void checkBuffer() {
+        if (buffer == null) {
+            throw new IllegalStateException("Instruction encoding hasn't started or already finished");
+        }
     }
 
     @Override
