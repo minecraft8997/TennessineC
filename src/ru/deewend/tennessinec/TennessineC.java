@@ -224,7 +224,7 @@ public class TennessineC {
 
         idx = 0;
         tokenizedLines.switchToLine(0);
-        TMethod methodBeingParsed = null;
+        TFunction functionBeingParsed = null;
         while (hasMoreTokens()) {
             String nextToken;
             if (Scope.isRootScope()) {
@@ -276,8 +276,8 @@ public class TennessineC {
                 }
                 if (!nextToken().equals("{")) tokenizedLines.issue("expected an opening curly brace");
 
-                methodBeingParsed = TMethod.of(false, type, name, parameterTypes, hasVarargs);
-                exporter.putInstruction("DefineMethod", methodBeingParsed);
+                functionBeingParsed = TFunction.of(false, type, name, parameterTypes, hasVarargs);
+                exporter.putInstruction("DefineFunction", functionBeingParsed);
             }
             boolean symbol = nextTokenIs(TokenizedCode.TokenType.SYMBOL);
             nextToken = nextToken();
@@ -289,12 +289,12 @@ public class TennessineC {
             }
             if (nextToken.equals("}")) {
                 int stackSize = Scope.popScope();
-                if (stackSize != Scope.NOT_A_METHOD_SCOPE) {
+                if (stackSize != Scope.NOT_A_FUNCTION_SCOPE) {
                     //noinspection DataFlowIssue
-                    methodBeingParsed.setStackSize(stackSize);
-                    if (methodBeingParsed.isEntryMethod()) putExitProcess();
-                    finishMethod();
-                    methodBeingParsed = null;
+                    functionBeingParsed.setStackSize(stackSize);
+                    if (functionBeingParsed.isEntryFunction()) putExitProcess();
+                    finishFunction();
+                    functionBeingParsed = null;
                 }
 
                 continue;
@@ -302,17 +302,17 @@ public class TennessineC {
             if (nextToken.equals("return")) {
                 List<String> tokens = collectTokensUntilStatementEnd();
                 //noinspection DataFlowIssue
-                boolean voidReturnValue = (methodBeingParsed.getReturnType() == DataType.VOID);
+                boolean voidReturnValue = (functionBeingParsed.getReturnType() == DataType.VOID);
                 if (!tokens.isEmpty()) {
                     if (voidReturnValue) {
-                        tokenizedLines.warning("it is not expected that a void method will return an actual value");
+                        tokenizedLines.warning("it is not expected that a void function will return an actual value");
                     }
 
                     ExpressionEngine.parseExpression(exporter, tokens, false);
                 } else if (!voidReturnValue) {
-                    tokenizedLines.warning("a non-void method is expected to return an actual value");
+                    tokenizedLines.warning("a non-void function is expected to return an actual value");
                 }
-                finishMethod();
+                finishFunction();
             } else {
                 DataType type = DataType.recognizeDataType(nextToken);
 
@@ -322,14 +322,14 @@ public class TennessineC {
                     handleVariableDefinition(type);
                 } else {
                     if (!nextToken().equals("(")) {
-                        tokenizedLines.issue("expected either a variable declaration or a method call " +
+                        tokenizedLines.issue("expected either a variable declaration or a function call " +
                                 "(any other statements are currently unsupported)");
                     }
                     if (!symbol) {
                         tokenizedLines.issue("unexpected token: " + nextToken);
                     }
 
-                    handleMethodCall(nextToken);
+                    handleFunctionCall(nextToken);
                 }
             }
 
@@ -358,9 +358,9 @@ public class TennessineC {
         Helper.moveFromEAXToMem(exporter, data);
     }
 
-    private void handleMethodCall(String methodName) {
+    private void handleFunctionCall(String functionName) {
         List<String> tokens = collectTokensUntilStatementEnd();
-        Pair<Integer, Integer> result = ExpressionEngine.parseMethodParameters(exporter, tokens, 0);
+        Pair<Integer, Integer> result = ExpressionEngine.parseFunctionParameters(exporter, tokens, 0);
         int idx = result.getFirst();
         if (idx != tokens.size() - 1) {
             tokenizedLines.issue("unexpected token(s): " +
@@ -368,7 +368,7 @@ public class TennessineC {
         }
         int parameterCount = result.getSecond();
 
-        TMethod.putCallMethod(exporter, methodName, parameterCount);
+        TFunction.putCallFunction(exporter, functionName, parameterCount);
     }
 
     private List<String> collectTokensUntilStatementEnd() {
@@ -381,15 +381,15 @@ public class TennessineC {
     }
 
     /*
-     * Assuming this is the end of the method.
+     * Assuming this is the end of the function.
      */
     private void putExitProcess() {
         exporter.putInstruction("PushByte", 0);
-        TMethod.putCallMethod(exporter, "ExitProcess", 1);
+        TFunction.putCallFunction(exporter, "ExitProcess", 1);
     }
 
-    private void finishMethod() {
-        exporter.putInstruction("FinishMethod", Helper.NOTHING);
+    private void finishFunction() {
+        exporter.putInstruction("FinishFunction", Helper.NOTHING);
     }
 
     private boolean nextTokenIs(TokenizedCode.TokenType type) {

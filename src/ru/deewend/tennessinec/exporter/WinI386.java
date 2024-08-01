@@ -145,22 +145,22 @@ public class WinI386 implements Exporter {
 
         // imports
 
-        Set<Pair<LibraryName, Set<TMethod>>> importsSet = metadata.importsSet();
-        int methodCount = 0;
-        int methodsLength = 0;
-        for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
-            Set<TMethod> externalMethods = pair.getSecond();
-            methodCount += externalMethods.size();
-            for (TMethod method : externalMethods) {
-                methodsLength += 2 + method.getName().length() + 1; // check encoding?
+        Set<Pair<LibraryName, Set<TFunction>>> importsSet = metadata.importsSet();
+        int functionCount = 0;
+        int functionsLength = 0;
+        for (Pair<LibraryName, Set<TFunction>> pair : importsSet) {
+            Set<TFunction> externalFunctions = pair.getSecond();
+            functionCount += externalFunctions.size();
+            for (TFunction function : externalFunctions) {
+                functionsLength += 2 + function.getName().length() + 1; // check encoding?
             }
         }
-        int sectionSize = (methodCount + 1) * 20; // 20 = sizeof(int) * fieldsCount
-        int methodPointersLength = methodCount * 8;
-        sectionSize += methodPointersLength;
-        sectionSize += methodsLength;
-        sectionSize += methodPointersLength;
-        for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
+        int sectionSize = (functionCount + 1) * 20; // 20 = sizeof(int) * fieldsCount
+        int functionPointersLength = functionCount * 8;
+        sectionSize += functionPointersLength;
+        sectionSize += functionsLength;
+        sectionSize += functionPointersLength;
+        for (Pair<LibraryName, Set<TFunction>> pair : importsSet) {
             LibraryName name = pair.getFirst();
             sectionSize += name.getName().length() + 1; // null terminator
         }
@@ -169,7 +169,7 @@ public class WinI386 implements Exporter {
 
         int currentPointer = sectionSize;
         Map<LibraryName, Integer> libraryNamePointers = new HashMap<>();
-        for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
+        for (Pair<LibraryName, Set<TFunction>> pair : importsSet) {
             LibraryName name = pair.getFirst();
             String uppercaseName = name.defaultCase();
             byte[] bytes = (uppercaseName + "\0").getBytes(StandardCharsets.US_ASCII);
@@ -181,20 +181,20 @@ public class WinI386 implements Exporter {
             importsBuffer.position(currentPointer);
             importsBuffer.put(bytes, 0, length);
         }
-        currentPointer -= methodPointersLength; // we'll fill it later
+        currentPointer -= functionPointersLength; // we'll fill it later
         int thePointer0 = currentPointer;
 
-        Map<Pair<LibraryName, TMethod>, Integer> methodNamePointers = new HashMap<>();
+        Map<Pair<LibraryName, TFunction>, Integer> functionNamePointers = new HashMap<>();
         boolean firstTime = true;
         int end = 0;
         int start = 0;
-        int methodsWritten = 0;
-        int pointerToCurrentPointerToMethodName = currentPointer - methodsLength - 8;
-        for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
+        int functionsWritten = 0;
+        int pointerToCurrentPointerToFunctionName = currentPointer - functionsLength - 8;
+        for (Pair<LibraryName, Set<TFunction>> pair : importsSet) {
             LibraryName libraryName = pair.getFirst();
 
-            for (TMethod method : pair.getSecond()) {
-                String name = method.getName();
+            for (TFunction function : pair.getSecond()) {
+                String name = function.getName();
                 //               hint
                 byte[] bytes = ("\0\0" + name + "\0").getBytes(StandardCharsets.US_ASCII);
                 int length = bytes.length;
@@ -205,7 +205,7 @@ public class WinI386 implements Exporter {
                 importsBuffer.position(payloadPointer);
                 importsBuffer.put(bytes, 0, length);
 
-                int thePointer = pointerToCurrentPointerToMethodName - (8 * methodsWritten);
+                int thePointer = pointerToCurrentPointerToFunctionName - (8 * functionsWritten);
                 importsBuffer.putLong(thePointer, (IMPORTS_VA + payloadPointer));
                 if (firstTime) {
                     end = thePointer + 8;
@@ -214,20 +214,20 @@ public class WinI386 implements Exporter {
                 }
                 start = thePointer;
 
-                methodNamePointers.put(Pair.of(libraryName, method), thePointer);
+                functionNamePointers.put(Pair.of(libraryName, function), thePointer);
 
-                methodsWritten++;
+                functionsWritten++;
             }
         }
         importsBuffer.position(0);
 
-        for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
+        for (Pair<LibraryName, Set<TFunction>> pair : importsSet) {
             LibraryName libraryName = pair.getFirst();
 
-            for (TMethod method : pair.getSecond()) {
-                int pointer1 = IMPORTS_VA + methodNamePointers.get(Pair.of(libraryName, method));
+            for (TFunction function : pair.getSecond()) {
+                int pointer1 = IMPORTS_VA + functionNamePointers.get(Pair.of(libraryName, function));
                 int pointerToLibraryName = IMPORTS_VA + libraryNamePointers.get(libraryName);
-                int pointer2 = pointer1 + methodsLength + methodPointersLength;
+                int pointer2 = pointer1 + functionsLength + functionPointersLength;
 
                 importsBuffer.putInt(pointer1);
                 importsBuffer.putInt(0);
@@ -235,7 +235,7 @@ public class WinI386 implements Exporter {
                 importsBuffer.putInt(pointerToLibraryName);
                 importsBuffer.putInt(pointer2);
 
-                method.setVirtualAddress(IMAGE_BASE + pointer2);
+                function.setVirtualAddress(IMAGE_BASE + pointer2);
             }
         }
         importsBuffer.putInt(0);
@@ -260,10 +260,10 @@ public class WinI386 implements Exporter {
         this.buffer = null;
         checkOverflow(buffer.position() - CODE_SECTION_START);
 
-        TMethod entryMethod = TMethod.lookupEntryMethod();
-        int entryVirtualAddress = entryMethod.getVirtualAddress();
-        if (entryVirtualAddress == TMethod.UNINITIALIZED_VIRTUAL_ADDRESS) {
-            throw new AssertionError("Virtual address of the entry method is uninitialized. " +
+        TFunction entryFunction = TFunction.lookupEntryFunction();
+        int entryVirtualAddress = entryFunction.getVirtualAddress();
+        if (entryVirtualAddress == TFunction.UNINITIALIZED_VIRTUAL_ADDRESS) {
+            throw new AssertionError("Virtual address of the entry function is uninitialized. " +
                     "Most likely a compiler bug");
         }
         buffer.putInt(0x68 /* 0x58 + 16 bytes */, entryVirtualAddress - IMAGE_BASE);

@@ -5,31 +5,31 @@ import java.util.Map;
 import java.util.Objects;
 
 public class Scope {
-    public static final int MAX_METHOD_STACK_SIZE = 256;
+    public static final int MAX_FUNCTION_STACK_SIZE = 256;
     public static final int INITIAL_PARAMETER_OFFSET = 8;
 
-    public static final int NOT_A_METHOD_SCOPE = -1;
+    public static final int NOT_A_FUNCTION_SCOPE = -1;
 
     private static final Scope ROOT_SCOPE = new Scope(null, true, false);
 
     private static Scope currentScope = ROOT_SCOPE;
-    private static int sizeOfCurrentMethodParameters;
-    private static int sizeOfCurrentMethodLocalVariables;
+    private static int sizeOfCurrentFunctionParameters;
+    private static int sizeOfCurrentFunctionLocalVariables;
 
     private final Scope parent;
     private final boolean rootScope;
-    private final boolean methodScope;
+    private final boolean functionScope;
     private final Map<String, VariableData> variables;
 
-    private Scope(Scope parent, boolean rootScope, boolean methodScope) {
+    private Scope(Scope parent, boolean rootScope, boolean functionScope) {
         this.parent = parent;
         this.rootScope = rootScope;
-        this.methodScope = methodScope;
+        this.functionScope = functionScope;
         this.variables = new HashMap<>();
 
-        if (methodScope) {
-            sizeOfCurrentMethodParameters = 0;
-            sizeOfCurrentMethodLocalVariables = 0;
+        if (functionScope) {
+            sizeOfCurrentFunctionParameters = 0;
+            sizeOfCurrentFunctionLocalVariables = 0;
         }
     }
 
@@ -38,14 +38,14 @@ public class Scope {
     }
 
     public static int popScope() {
-        if (currentScope == ROOT_SCOPE) return NOT_A_METHOD_SCOPE;
+        if (currentScope == ROOT_SCOPE) return NOT_A_FUNCTION_SCOPE;
 
-        boolean wasMethodScope = currentScope.methodScope;
+        boolean wasFunctionScope = currentScope.functionScope;
         currentScope = currentScope.parent;
 
-        if (wasMethodScope) return sizeOfCurrentMethodLocalVariables;
+        if (wasFunctionScope) return sizeOfCurrentFunctionLocalVariables;
 
-        return NOT_A_METHOD_SCOPE;
+        return NOT_A_FUNCTION_SCOPE;
     }
 
     public static void addVariable(String name, VariableData data, boolean parameter) {
@@ -63,16 +63,16 @@ public class Scope {
         int size = data.getType().getSize();
         int stackOffset;
         if (parameter) {
-            stackOffset = INITIAL_PARAMETER_OFFSET /* 8 */ + sizeOfCurrentMethodParameters;
-            sizeOfCurrentMethodParameters += size;
+            stackOffset = INITIAL_PARAMETER_OFFSET /* 8 */ + sizeOfCurrentFunctionParameters;
+            sizeOfCurrentFunctionParameters += size;
         } else {
-            sizeOfCurrentMethodLocalVariables += size;
-            stackOffset = MAX_METHOD_STACK_SIZE - sizeOfCurrentMethodLocalVariables; // different order is intended
+            sizeOfCurrentFunctionLocalVariables += size;
+            stackOffset = MAX_FUNCTION_STACK_SIZE - sizeOfCurrentFunctionLocalVariables; // different order is intended
         }
-        int sum = sizeOfCurrentMethodParameters + sizeOfCurrentMethodLocalVariables;
-        if (sum > MAX_METHOD_STACK_SIZE - INITIAL_PARAMETER_OFFSET) { // if (sum > 248)
+        int sum = sizeOfCurrentFunctionParameters + sizeOfCurrentFunctionLocalVariables;
+        if (sum > MAX_FUNCTION_STACK_SIZE - INITIAL_PARAMETER_OFFSET) { // if (sum > 248)
             throw new IllegalStateException("Cannot store variable \"" + name + "\" in the stack. In " +
-                    "this TennessineC version the stack size is limited to " + MAX_METHOD_STACK_SIZE + " bytes " +
+                    "this TennessineC version the stack size is limited to " + MAX_FUNCTION_STACK_SIZE + " bytes " +
                     "(the first " + INITIAL_PARAMETER_OFFSET + " bytes are reserved)");
         }
         data.setStackOffset(stackOffset);
@@ -105,7 +105,7 @@ public class Scope {
         return currentScope.rootScope;
     }
 
-    public static boolean isMethodScope() {
-        return currentScope.methodScope;
+    public static boolean isFunctionScope() {
+        return currentScope.functionScope;
     }
 }

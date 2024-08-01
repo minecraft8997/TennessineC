@@ -2,18 +2,17 @@ package ru.deewend.tennessinec.instruction;
 
 import ru.deewend.tennessinec.*;
 import ru.deewend.tennessinec.exporter.Exporter;
-import ru.deewend.tennessinec.exporter.WinI386;
 
 import java.nio.ByteBuffer;
 
 @NotARealMachineInstruction
-public class I386DefineMethod implements Instruction {
+public class I386DefineFunction implements Instruction {
     private final Exporter exporter;
-    private final TMethod method;
+    private final TFunction function;
 
-    public I386DefineMethod(Exporter exporter, TMethod method) {
+    public I386DefineFunction(Exporter exporter, TFunction function) {
         this.exporter = exporter;
-        this.method = method;
+        this.function = function;
     }
 
     @Override
@@ -32,9 +31,9 @@ public class I386DefineMethod implements Instruction {
                 .setMod(ModRM.MOD_REGISTER_TO_REGISTER)
                 .setReg(ModRM.REG_ESP)
                 .setRm(ModRM.RM_CONSTANT)
-                .value(), method.getStackSize())); // SUB ESP,<stackSize>
+                .value(), function.getStackSize())); // SUB ESP,<stackSize>
         exporter.encodeLastInstruction();
 
-        method.setVirtualAddress(virtualAddress);
+        function.setVirtualAddress(virtualAddress);
     }
 }

@@ -132,7 +132,7 @@ public class Preprocessor {
             }
             String libraryName = Helper.stringTokenToString(tokenizedCode.nextToken());
             if (tokenizedCode.getNextTokenTypeOmitComma(true) != TokenizedCode.TokenType.SYMBOL) {
-                tokenizedCode.issue("expected a symbol (external method return type)");
+                tokenizedCode.issue("expected a symbol (external function return type)");
             }
             String returnTypeRaw = tokenizedCode.nextToken();
             DataType returnType = DataType.recognizeDataType(returnTypeRaw);
@@ -140,9 +140,9 @@ public class Preprocessor {
                 tokenizedCode.issue("unrecognized data type: " + returnTypeRaw);
             }
             if (tokenizedCode.getNextTokenTypeOmitComma(true) != TokenizedCode.TokenType.LITERAL_STRING) {
-                tokenizedCode.issue("expected a string literal (external method name)");
+                tokenizedCode.issue("expected a string literal (external function name)");
             }
-            String methodName = Helper.stringTokenToString(tokenizedCode.nextToken());
+            String functionName = Helper.stringTokenToString(tokenizedCode.nextToken());
             List<DataType> types = new ArrayList<>();
 
             boolean hasVarargs = false;
@@ -176,7 +176,7 @@ public class Preprocessor {
 
             tokenizedCode.removeLine(compiler.idx);
 
-            compiler.metadata.addImport(libraryName, returnType, methodName, types, hasVarargs);
+            compiler.metadata.addImport(libraryName, returnType, functionName, types, hasVarargs);
 
             return true;
         }

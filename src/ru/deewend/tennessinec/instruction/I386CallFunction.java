@@ -1,28 +1,28 @@
 package ru.deewend.tennessinec.instruction;
 
 import ru.deewend.tennessinec.ModRM;
-import ru.deewend.tennessinec.TMethod;
+import ru.deewend.tennessinec.TFunction;
 import ru.deewend.tennessinec.exporter.Exporter;
 
 import java.nio.ByteBuffer;
 
-public class I386CallMethod implements Instruction {
+public class I386CallFunction implements Instruction {
     private final Exporter exporter;
-    private final TMethod method;
+    private final TFunction function;
 
-    public I386CallMethod(Exporter exporter, TMethod method) {
+    public I386CallFunction(Exporter exporter, TFunction function) {
         this.exporter = exporter;
-        this.method = method;
+        this.function = function;
     }
 
     @Override
     public void encode(ByteBuffer buffer) {
-        int virtualAddress = method.getVirtualAddress();
-        if (virtualAddress == TMethod.UNINITIALIZED_VIRTUAL_ADDRESS) {
-            throw new RuntimeException("Virtual address of method \"" + method.toStringExtended() + "\" is " +
+        int virtualAddress = function.getVirtualAddress();
+        if (virtualAddress == TFunction.UNINITIALIZED_VIRTUAL_ADDRESS) {
+            throw new RuntimeException("Virtual address of function \"" + function.toStringExtended() + "\" is " +
                     "unknown");
         }
-        if (method.isExternal()) {
+        if (function.isExternal()) {
             buffer.putShort((short) 0x15FF);
             buffer.putInt(virtualAddress);
         } else {

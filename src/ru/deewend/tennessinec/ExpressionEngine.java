@@ -55,7 +55,7 @@ public class ExpressionEngine {
                  * .setRm(REG2)
                  *
                  * it means you would like to perform MOV REG1,REG2 operation. It works as intended for example
-                 * in I386DefineMethod Instruction (where we perform MOV EBP,ESP), however, to perform
+                 * in I386DefineFunction Instruction (where we perform MOV EBP,ESP), however, to perform
                  * ADD/SUB/MOV EBX,EAX (and vice-versa) we have to put the registers in a different order.
                  * Should probably research the reason eventually.
                  */
@@ -90,15 +90,15 @@ public class ExpressionEngine {
                 exporter.putInstruction("MovEAX", Integer.parseInt(currentToken, base));
             } else if (TokenizedCode.TokenType.SYMBOL.detect(currentToken)) {
                 if (theExpressionTokens.size() > 1 && theExpressionTokens.get(1).equals("(")) {
-                    // this is a method call
+                    // this is a function call
                     Pair<Integer, Integer> result =
-                            parseMethodParameters(exporter, theExpressionTokens, 2);
+                            parseFunctionParameters(exporter, theExpressionTokens, 2);
 
                     int idx = result.getFirst();
                     int parameterCount = result.getSecond();
 
-                    TMethod.putCallMethod(exporter, currentToken, parameterCount);
-                    // the return value of the method will be located in the EAX register
+                    TFunction.putCallFunction(exporter, currentToken, parameterCount);
+                    // the return value of the function will be located in the EAX register
 
                     theExpressionTokens.subList(1, idx + 1).clear();
                 } else {
@@ -170,14 +170,14 @@ public class ExpressionEngine {
     }
 
     /*
-     * Treats each method parameter as an expression and attempts to parse it.
+     * Treats each function parameter as an expression and attempts to parse it.
      * After the parsing is done, pushes the value of EAX register for each parameter (from right to left).
      *
      * The method assumes that theExpressionTokens size is greater than or equal to "startingFrom",
      * theExpressionTokens.get(startingFrom - 2) is the function name (if presented) and that
      * theExpressionTokens.get(startingFrom - 1) is "(" -- an opening brace (if presented).
      */
-    public static Pair<Integer, Integer> parseMethodParameters(
+    public static Pair<Integer, Integer> parseFunctionParameters(
             Exporter exporter, List<String> theExpressionTokens, int startingFrom
     ) {
         int parameterCount = 0;

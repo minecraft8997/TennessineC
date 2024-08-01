@@ -3,8 +3,8 @@
 # TennessineC
 A small C compiler, written in pure Java, which is able to craft i386 Windows executables.
 
-Currently, supports basic FFI (via `#pragma tenc import` directives), variables, methods (still WIP though),
-expressions containing braces, variables, method calls, constants and summation, subtraction operators. The sole 
+Currently, supports basic FFI (via `#pragma tenc import` directives), variables, functions (still WIP though),
+expressions containing braces, variables, function calls, constants and summation, subtraction operators. The sole 
 data type currently supported is `int` (32-bit word).
 
 Note that at this moment I don't plan to strictly follow any of currently existing C standards, so this will probably

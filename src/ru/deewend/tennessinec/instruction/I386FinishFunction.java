@@ -5,10 +5,10 @@ import ru.deewend.tennessinec.exporter.Exporter;
 import java.nio.ByteBuffer;
 
 @NotARealMachineInstruction
-public class I386FinishMethod implements Instruction {
+public class I386FinishFunction implements Instruction {
     private final Exporter exporter;
 
-    public I386FinishMethod(Exporter exporter, Object nothing) {
+    public I386FinishFunction(Exporter exporter, Object nothing) {
         this.exporter = exporter;
     }
 
