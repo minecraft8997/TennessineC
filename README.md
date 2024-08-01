@@ -11,7 +11,7 @@ Note that at this moment I don't plan to strictly follow any of currently existi
 remain a toy compiler.
 
 ## Obtaining a pre-built binary
-To be documented.
+Please navigate to [Releases](https://github.com/minecraft8997/TennessineC/releases) section.
 
 ## Compiling [`examples/test.c`](https://github.com/minecraft8997/TennessineC/blob/master/examples/test.c)
 
