@@ -12,8 +12,6 @@ int test(int a, int b, int c) {
 
 void main() {
     int a = 1;
-    int result = test(a + 1 - 1, 2, 3);
 
-    // no wrong results anymore
-    printf("(%d, %d) but 1 + (1 + (2 - 3)) = %d or %d\n", result, a, a + test(a + 1 - 1, 2, 3), a + result);
+    printf("1 + (1 + (2 - 3)) = %d\n", a + test(a, 2, 3));
 }
