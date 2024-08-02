@@ -10,6 +10,8 @@ public class ExpressionEngine {
     private static final byte STAGE_EXPECTING_OPERATOR = 1;
     private static final byte STAGE_EXPECTING_SECOND_OPERAND = 2;
 
+    private static long currentTmpVar = 0;
+
     private ExpressionEngine() {
     }
 
@@ -91,21 +93,39 @@ public class ExpressionEngine {
             } else if (TokenizedCode.TokenType.SYMBOL.detect(currentToken)) {
                 if (theExpressionTokens.size() > 1 && theExpressionTokens.get(1).equals("(")) {
                     // this is a function call
+
+                    // FIXME solve the issue with keeping EBX value when handling inner expressions in a different way
+                    if (Scope.isRootScope()) {
+                        throw new UnsupportedOperationException("Expressions containing function calls " +
+                                "in the root scope are unsupported in this TennessineC version");
+                    }
+                    VariableData tmpVarData = VariableData.of(DataType.INT);
+                    Scope.addVariable("#TmpVar" + (currentTmpVar++), tmpVarData, false);
+                    Helper.moveFromRegToMem(exporter, ModRM.REG_EBX, tmpVarData);
+
                     Pair<Integer, Integer> result =
                             parseFunctionParameters(exporter, theExpressionTokens, 2);
 
                     int idx = result.getFirst();
                     int parameterCount = result.getSecond();
 
-                    TFunction.putCallFunction(exporter, currentToken, parameterCount);
                     // the return value of the function will be located in the EAX register
+                    TFunction.putCallFunction(exporter, currentToken, parameterCount);
+
+                    // restore the previous EBX value
+                    Helper.moveFromMemToReg(exporter, ModRM.REG_EBX, tmpVarData);
+
+                    // move 0 to the place where EBX value was stored, for security measures
+                    // TODO might be we don't need this?
+                    exporter.putInstruction("MovECX", 0);
+                    Helper.moveFromRegToMem(exporter, ModRM.REG_ECX, tmpVarData);
 
                     theExpressionTokens.subList(1, idx + 1).clear();
                 } else {
                     // this is a variable name
 
                     VariableData data = Scope.findVariable(currentToken);
-                    Helper.moveFromMemToEAX(exporter, data);
+                    Helper.moveFromMemToReg(exporter, ModRM.REG_EAX, data);
                 }
             } else {
                 throw new IllegalArgumentException("Invalid expression: unexpected token: " + currentToken);

@@ -8,8 +8,10 @@ public class Tokenizer {
 
     private String line;
     private String token;
+    private String sourceFilename;
     private int i;
     private int lineNumber;
+    boolean noticedMultilineComment;
 
     private Tokenizer() {
     }
@@ -30,9 +32,10 @@ public class Tokenizer {
         return isLetter(symbol) || isDigit(symbol);
     }
 
-    public List<String> tokenizeLine(String originalLine, int lineNumber) {
+    public List<String> tokenizeLine(String originalLine, int lineNumber, String sourceFilename) {
         this.line = originalLine;
         this.lineNumber = lineNumber;
+        this.sourceFilename = sourceFilename;
 
         List<String> result = new ArrayList<>();
         while (!line.isEmpty()) {
@@ -42,15 +45,33 @@ public class Tokenizer {
 
             token = null;
             char firstSymbol = line.charAt(0);
-            if (isLetterOrDigit(firstSymbol)) {
+
+            if (line.startsWith("/*") || noticedMultilineComment) {
+                i = (noticedMultilineComment ? 1 : 3);
+                noticedMultilineComment = true;
+
+                for (; i < line.length(); i++) {
+                    char first = line.charAt(i - 1);
+                    char second = line.charAt(i);
+                    if (first == '*' && second == '/') {
+                        noticedMultilineComment = false;
+
+                        break;
+                    }
+                }
+                if (noticedMultilineComment) break;
+                token();
+
+                continue; // not adding that token
+            } else if (line.startsWith("//")) {
+                break;
+            } else if (isLetterOrDigit(firstSymbol)) {
                 for (i = 1; i < line.length(); i++) {
                     char currentChar = line.charAt(i);
                     if (!isLetterOrDigit(line.charAt(i)) && currentChar != '_') break;
                 }
                 i--;
                 token();
-            } else if (line.startsWith("//")) {
-                break;
             } else if (firstSymbol == '"') {
                 for (i = 1; i < line.length(); i++) {
                     char currentChar = line.charAt(i);
@@ -82,7 +103,7 @@ public class Tokenizer {
                 i = 2;
                 token();
             } else if ("#(){}+-/*.,;=\\".indexOf(firstSymbol) != -1) {
-                // todo implement support of <> (#include <something>)
+                // TODO implement support of <> (#include <something>)
                 i = 0;
                 token(); // instead of token = String.valueOf(firstSymbol); line = line.substring(1);
             } else {
@@ -100,7 +121,7 @@ public class Tokenizer {
         line = line.substring(i + 1);
     }
 
-    private void issue(String message) {
-        throw new IllegalArgumentException("Line " + lineNumber + ": " + message);
+    void issue(String message) {
+        throw new IllegalArgumentException("[Tokenizer] " + sourceFilename + " at line " + lineNumber + ": " + message);
     }
 }

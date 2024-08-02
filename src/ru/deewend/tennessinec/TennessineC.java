@@ -170,7 +170,7 @@ public class TennessineC {
     public void load() {
         // assuming sourceStream will be closed by the caller
         // both BufferedStream and InputStreamReader themselves don't hold any native resources, not closing them
-        List<List<String>> tokenizedLines = Helper.tokenize(sourceStream);
+        List<List<String>> tokenizedLines = Helper.tokenize(sourceStream, sourceFilename);
 
         this.tokenizedLines = TokenizedCode.of(tokenizedLines, sourceFilename);
         Thread.currentThread().setUncaughtExceptionHandler((t, e) -> {
@@ -241,7 +241,7 @@ public class TennessineC {
                 if (action.equals("=") || action.equals(";")) {
                     type.checkCanBeUsedForVariableDefinition();
 
-                    tokenizedLines.issue("global variables are currently unsupported");
+                    tokenizedLines.issue("global variables are unsupported in this TennessineC version");
                 }
                 if (!action.equals("(")) tokenizedLines.issue("expected an opening brace (\"(\"), found: " + action);
 
@@ -323,7 +323,7 @@ public class TennessineC {
                 } else {
                     if (!nextToken().equals("(")) {
                         tokenizedLines.issue("expected either a variable declaration or a function call " +
-                                "(any other statements are currently unsupported)");
+                                "(any other statements are unsupported in this TennessineC version)");
                     }
                     if (!symbol) {
                         tokenizedLines.issue("unexpected token: " + nextToken);
@@ -355,7 +355,7 @@ public class TennessineC {
         }
         ExpressionEngine.parseExpression(exporter, tokens, false);
 
-        Helper.moveFromEAXToMem(exporter, data);
+        Helper.moveFromRegToMem(exporter, ModRM.REG_EAX, data);
     }
 
     private void handleFunctionCall(String functionName) {

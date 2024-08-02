@@ -1,6 +1,5 @@
 package ru.deewend.tennessinec.instruction;
 
-import ru.deewend.tennessinec.ModRM;
 import ru.deewend.tennessinec.TFunction;
 import ru.deewend.tennessinec.exporter.Exporter;
 
@@ -32,11 +31,13 @@ public class I386CallFunction implements Instruction {
             buffer.put((byte) 0xE8);
             buffer.putInt(offset);
 
-            // ADD ESP,0x4 // TODO do we really need it at all? It seems to break things
-            buffer.put((byte) 0x83);
-            buffer.put(ModRM.builder().setMod(ModRM.MOD_REGISTER_TO_REGISTER).setReg(0b000).setRm(0b100).byteValue());
-            buffer.put((byte) 0x4);
+            // ADD ESP,<from.stackSize>
+            // TODO do we really need it at all? It seems to break things
             // TODO re-implement when Add instruction with an immediate value will be supported
+            // buffer.put((byte) 0x83);
+            // buffer.put(ModRM.builder().setMod(ModRM.MOD_REGISTER_TO_REGISTER).setReg(0b000).setRm(0b100)
+            //         .byteValue());
+            // buffer.put((byte) from.getStackSize());
         }
     }
 }

@@ -25,7 +25,8 @@ public class I386Sub implements Instruction {
         boolean hasImmediateValue = (constant != Helper.SKIP_PARAMETER);
         if (add) {
             if (hasImmediateValue) {
-                throw new RuntimeException("Instruction Add with an immediate value is currently unsupported");
+                throw new RuntimeException("Instruction Add with an " +
+                        "immediate value is unsupported in this TennessineC version");
             }
             buffer.put((byte) 0x01);
             buffer.put((byte) modRM);

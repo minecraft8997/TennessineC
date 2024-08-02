@@ -53,7 +53,7 @@ public class Scope {
         Objects.requireNonNull(data);
 
         if (currentScope == ROOT_SCOPE) {
-            throw new IllegalStateException("Global variables are not supported in this TennessineC version");
+            throw new IllegalStateException("Global variables are unsupported in this TennessineC version");
         }
 
         if (findVariable(currentScope, name) != null) {

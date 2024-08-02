@@ -99,7 +99,7 @@ public class Preprocessor {
         List<List<String>> tokenizedLines;
         File file = new File(compiler.parentDirectory, fileName);
         try (InputStream stream = new FileInputStream(file)) {
-            tokenizedLines = Helper.tokenize(stream);
+            tokenizedLines = Helper.tokenize(stream, file.getPath());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -202,7 +202,7 @@ public class Preprocessor {
                         break;
                     }
                     default: {
-                        tokenizedCode.issue("Subsystems other than \"gui\" and \"cli\" are currently unsupported");
+                        tokenizedCode.issue("Subsystems other than \"gui\" and \"cli\" are unsupported");
 
                         break;
                     }
@@ -359,7 +359,7 @@ public class Preprocessor {
         while (tokenizedCode.hasMoreTokens()) {
             String nextToken = tokenizedCode.nextToken();
             if (isDefine && !tokenizedCode.hasMoreTokens() && nextToken.equals("\\")) {
-                tokenizedCode.issue("multi-line #defines are not supported");
+                tokenizedCode.issue("multi-line #defines are unsupported in this TennessineC version");
             }
             value.add(nextToken);
         }

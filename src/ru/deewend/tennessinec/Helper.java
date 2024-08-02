@@ -80,7 +80,8 @@ public class Helper {
         return result;
     }
 
-    public static List<List<String>> tokenize(InputStream sourceStream) {
+    public static List<List<String>> tokenize(InputStream sourceStream, String sourceFilename) {
+        //noinspection ExtractMethodRecommender
         List<String> sourceLines = new ArrayList<>();
         try {
             // assuming sourceStream will be closed by the caller
@@ -93,7 +94,10 @@ public class Helper {
         }
         List<List<String>> tokenizedLines = new ArrayList<>();
         for (int i = 0; i < sourceLines.size(); i++) {
-            tokenizedLines.add(Tokenizer.getInstance().tokenizeLine(sourceLines.get(i), i));
+            tokenizedLines.add(Tokenizer.getInstance().tokenizeLine(sourceLines.get(i), i, sourceFilename));
+        }
+        if (Tokenizer.getInstance().noticedMultilineComment) {
+            Tokenizer.getInstance().issue("unterminated multiline comment");
         }
 
         return tokenizedLines;
@@ -136,22 +140,24 @@ public class Helper {
         return instance;
     }
 
-    private static void moveVariable(Exporter exporter, MovType mode, VariableData data) {
+    private static void moveVariable(Exporter exporter, MovType mode, int register, VariableData data) {
+        int stackOffset = data.getStackOffset();
+
         exporter.putInstruction("Mov", Triple.of(mode, ModRM.builder()
-                .setMod(ModRM.MOD_1_BYTE_DISPLACEMENT)
-                .setReg(ModRM.REG_EAX)
-                .setRm(0b101) // EBP + disp8 (?)
-                .value(), data.getStackOffset()));
+                .setMod(stackOffset < 0 ? ModRM.MOD_4_BYTE_DISPLACEMENT : ModRM.MOD_1_BYTE_DISPLACEMENT)
+                .setReg(register)
+                .setRm(0b101) // EBP + disp8/32 (?)
+                .value(), stackOffset));
     }
 
-    public static void moveFromEAXToMem(Exporter exporter, VariableData data) {
+    public static void moveFromRegToMem(Exporter exporter, int register, VariableData data) {
         // MOV dword ptr [EBP + stackOffset],EAX
-        moveVariable(exporter, MovType.REG_TO_REG_OR_REG_TO_MEM, data);
+        moveVariable(exporter, MovType.REG_TO_REG_OR_REG_TO_MEM, register, data);
     }
 
-    public static void moveFromMemToEAX(Exporter exporter, VariableData data) {
+    public static void moveFromMemToReg(Exporter exporter, int register, VariableData data) {
         // MOV EAX,dword ptr [EBP + stackOffset]
-        moveVariable(exporter, MovType.MEM_TO_REG_OR_MEM_TO_MEM, data);
+        moveVariable(exporter, MovType.MEM_TO_REG_OR_MEM_TO_MEM, register, data);
     }
 
     public static void putString(ByteBuffer buffer, String str) {
