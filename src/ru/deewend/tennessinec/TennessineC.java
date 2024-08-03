@@ -314,12 +314,15 @@ public class TennessineC {
                 }
                 finishFunction();
             } else {
+                VariableData data;
                 DataType type = DataType.recognizeDataType(nextToken);
 
                 if (type != null) {
                     type.checkCanBeUsedForVariableDefinition();
 
-                    handleVariableDefinition(type);
+                    handleVariableStatement(true, type, null);
+                } else if ((data = Scope.findVariable(nextToken, false)) != null) {
+                    handleVariableStatement(false, null, data);
                 } else {
                     if (!nextToken().equals("(")) {
                         tokenizedLines.issue("expected either a variable declaration or a function call " +
@@ -337,20 +340,27 @@ public class TennessineC {
         }
     }
 
-    private void handleVariableDefinition(DataType recognizedType) {
-        if (getNextTokenType() != TokenizedCode.TokenType.SYMBOL) {
-            tokenizedLines.issue("expected the next token to be a symbol (variable name)");
+    /*
+     * In "definition" mode "recognizedType" is expected to be non-null and "data" to be null.
+     * If "definition" is false, "recognizedType" is expected to be null and "data" to be non-null.
+     */
+    private void handleVariableStatement(boolean definition, DataType recognizedType, VariableData data) {
+        if (definition) {
+            if (getNextTokenType() != TokenizedCode.TokenType.SYMBOL) {
+                tokenizedLines.issue("expected the next token to be a symbol (variable name)");
+            }
+            String variableName = nextToken();
+            Scope.addVariable(variableName, (data = VariableData.of(recognizedType)), false);
         }
-        String variableName = nextToken();
-        VariableData data;
-        Scope.addVariable(variableName, (data = VariableData.of(recognizedType)), false);
-
         boolean noValue;
         if (!(noValue = nextTokenIs(TokenizedCode.TokenType.STATEMENT_END)) && !nextToken().equals("=")) {
             tokenizedLines.issue("expected an assignment");
         }
         List<String> tokens = collectTokensUntilStatementEnd();
         if (noValue) { // might be should use tokens.isEmpty() instead?
+            if (!definition) {
+                tokenizedLines.issue("expected an expression (new variable value) instead of statement termination");
+            }
             tokens.add("0");
         }
         ExpressionEngine.parseExpression(exporter, tokens, false);

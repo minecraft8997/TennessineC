@@ -93,8 +93,12 @@ public class Scope {
     }
 
     public static VariableData findVariable(String name) {
+        return findVariable(name, true);
+    }
+
+    public static VariableData findVariable(String name, boolean throwException) {
         VariableData result = findVariable(currentScope, name);
-        if (result == null) {
+        if (result == null && throwException) {
             throw new IllegalArgumentException("Failed to find variable \"" + name + "\" in the current scope");
         }
 
