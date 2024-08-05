@@ -20,12 +20,15 @@ public class Scope {
     private final boolean rootScope;
     private final boolean functionScope;
     private final Map<String, VariableData> variables;
+    // note that unlike variables, parent Scopes don't share their metadata with child Scopes
+    private final Map<String, Object> metadata;
 
     private Scope(Scope parent, boolean rootScope, boolean functionScope) {
         this.parent = parent;
         this.rootScope = rootScope;
         this.functionScope = functionScope;
         this.variables = new HashMap<>();
+        this.metadata = new HashMap<>();
 
         if (functionScope) {
             sizeOfCurrentFunctionParameters = 0;
@@ -46,6 +49,18 @@ public class Scope {
         if (wasFunctionScope) return sizeOfCurrentFunctionLocalVariables;
 
         return NOT_A_FUNCTION_SCOPE;
+    }
+
+    public static Object putMetadata(String key, Object value) {
+        return currentScope.metadata.put(key, value);
+    }
+
+    public static boolean hasMetadata(String key) {
+        return currentScope.metadata.containsKey(key);
+    }
+
+    public static Object getMetadata(String key) {
+        return currentScope.metadata.get(key);
     }
 
     public static void addVariable(String name, VariableData data, boolean parameter) {

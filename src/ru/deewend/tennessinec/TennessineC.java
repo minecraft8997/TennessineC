@@ -224,6 +224,8 @@ public class TennessineC {
 
         idx = 0;
         tokenizedLines.switchToLine(0);
+
+        boolean loopScope;
         TFunction functionBeingParsed = null;
         while (hasMoreTokens()) {
             String nextToken;
@@ -281,13 +283,24 @@ public class TennessineC {
             }
             boolean symbol = nextTokenIs(TokenizedCode.TokenType.SYMBOL);
             nextToken = nextToken();
-            //noinspection IfCanBeSwitch
             if (nextToken.equals("{")) {
                 Scope.pushScope();
 
                 continue;
             }
             if (nextToken.equals("}")) {
+                if (Scope.hasMetadata("conditionScope")) {
+                    String labelName;
+                    if (Scope.hasMetadata("loopScope")) {
+                        exporter.putInstruction("Jmp", Pair.of("LoopCondition", true));
+
+                        labelName = "LoopEnd";
+                    } else {
+                        labelName = "ConditionalBlockEnd";
+                    }
+
+                    exporter.putInstruction("Label", labelName);
+                }
                 int stackSize = Scope.popScope();
                 if (stackSize != Scope.NOT_A_FUNCTION_SCOPE) {
                     //noinspection DataFlowIssue
@@ -313,6 +326,33 @@ public class TennessineC {
                     tokenizedLines.warning("a non-void function is expected to return an actual value");
                 }
                 finishFunction();
+            } else if ((loopScope = nextToken.equals("while")) || nextToken.equals("if")) {
+                List<String> tokens = new ArrayList<>();
+                String token;
+                // braces are intentionally omitted, ExpressionEngine should be able to handle them
+                while (!(token = nextToken()).equals("{")) {
+                    tokens.add(token);
+                }
+                if (loopScope) {
+                    exporter.putInstruction("Label", "LoopCondition");
+                }
+                ExpressionEngine.parseExpression(exporter, tokens, false);
+
+                exporter.putInstruction("Test", ModRM.builder()
+                        .setMod(ModRM.MOD_REGISTER_TO_REGISTER)
+                        .setReg(ModRM.REG_EAX)
+                        .setRm(ModRM.REG_EAX)
+                        .value()); // TEST EAX,EAX (identical to CMP EAX,0)
+
+                exporter.putInstruction("Jz", Pair.of((loopScope ? "LoopEnd" : "ConditionalBlockEnd"), false));
+
+                Scope.pushScope();
+                Scope.putMetadata("conditionScope", Helper.NOTHING);
+                if (loopScope) {
+                    Scope.putMetadata("loopScope", Helper.NOTHING);
+                }
+
+                continue;
             } else {
                 VariableData data;
                 DataType type = DataType.recognizeDataType(nextToken);

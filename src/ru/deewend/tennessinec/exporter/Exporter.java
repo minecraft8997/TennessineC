@@ -1,6 +1,7 @@
 package ru.deewend.tennessinec.exporter;
 
 import ru.deewend.tennessinec.Metadata;
+import ru.deewend.tennessinec.instruction.Instruction;
 
 import java.nio.ByteBuffer;
 
@@ -14,6 +15,8 @@ public interface Exporter {
      * being removed from the queue. (We don't want to encode it twice.)
      */
     void encodeLastInstruction();
+    int searchLabelAndGetAddress(String name, boolean rightToLeft);
     int currentVirtualAddress();
+    int currentEncodingPhase();
     int imageSize();
 }

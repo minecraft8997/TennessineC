@@ -6,7 +6,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class TFunction {
-    public static final int UNINITIALIZED_VIRTUAL_ADDRESS = 0;
     public static final int UNINITIALIZED_STACK_SIZE = 0;
 
     private static final Set<TFunction> KNOWN_FUNCTIONS = new HashSet<>();

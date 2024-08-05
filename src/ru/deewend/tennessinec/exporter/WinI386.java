@@ -1,6 +1,7 @@
 package ru.deewend.tennessinec.exporter;
 
 import ru.deewend.tennessinec.*;
+import ru.deewend.tennessinec.instruction.I386Label;
 import ru.deewend.tennessinec.instruction.Instruction;
 
 import java.lang.reflect.Constructor;
@@ -23,10 +24,17 @@ public class WinI386 implements Exporter {
     public static final int MAX_DATA_BYTES = SIZE_OF_HEADERS;
     public static final int DATA_SECTION_VIRTUAL_ADDRESS = 0x3000;
 
-    private final List<Instruction> instructionList = new ArrayList<>();
+    public static final int ENCODING_PHASE_CALCULATING_LABEL_ADDRESSES = 1;
+    public static final int ENCODING_PHASE_FINAL = 2;
+
+    private static final String INSTRUCTION_CLASS_PREFIX = "ru.deewend.tennessinec.instruction.I386";
+
+    private List<Instruction> instructionList = new ArrayList<>();
     private final List<byte[]> stringList = new LinkedList<>();
     private Metadata metadata;
+    private int encodingPhase;
     private ByteBuffer buffer;
+    private int currentInstructionIdx;
 
     @Override
     public void load(Metadata metadata) {
@@ -250,19 +258,28 @@ public class WinI386 implements Exporter {
 
         Helper.writeNullUntil(buffer, CODE_SECTION_START);
 
+        // FIXME (eventually). Encoding instructions twice just because of labels isn't a really nice solution
+        List<Instruction> instructionListReference = instructionList;
+        this.buffer = ByteBuffer.allocate(SIZE_OF_HEADERS);
+        // we don't really need to specify endianness for this buffer
+        instructionList = new ArrayList<>(instructionList);
+        encodingPhase = ENCODING_PHASE_CALCULATING_LABEL_ADDRESSES;
+
+        encodeInstructions();
+
         this.buffer = buffer;
-        // it's not replaceable
-        //noinspection ForLoopReplaceableByForEach
-        for (int i = 0; i < instructionList.size(); i++) {
-            Instruction instruction = instructionList.get(i);
-            instruction.encode(buffer);
-        }
-        this.buffer = null;
+        instructionList = instructionListReference;
+        encodingPhase = ENCODING_PHASE_FINAL;
+
+        encodeInstructions();
+
+        // TODO likely is a subject for removal. If an overflow didn't occur with a temporary Buffer,
+        //  it won't occur here
         checkOverflow(buffer.position() - CODE_SECTION_START);
 
         TFunction entryFunction = TFunction.lookupEntryFunction();
         int entryVirtualAddress = entryFunction.getVirtualAddress();
-        if (entryVirtualAddress == TFunction.UNINITIALIZED_VIRTUAL_ADDRESS) {
+        if (entryVirtualAddress == Helper.UNINITIALIZED_VIRTUAL_ADDRESS) {
             throw new AssertionError("Virtual address of the entry function is uninitialized. " +
                     "Most likely a compiler bug");
         }
@@ -287,6 +304,21 @@ public class WinI386 implements Exporter {
         }
     }
 
+    private void encodeInstructions() {
+        // don't replace with for each loop, ConcurrentModificationException might be thrown
+        for (currentInstructionIdx = 0; currentInstructionIdx < instructionList.size(); currentInstructionIdx++) {
+            Instruction instruction = instructionList.get(currentInstructionIdx);
+            if (instruction instanceof I386Label) {
+                if (encodingPhase == ENCODING_PHASE_CALCULATING_LABEL_ADDRESSES) {
+                    ((I386Label) instruction).setVirtualAddress(currentVirtualAddress());
+                }
+
+                continue;
+            }
+            instruction.encode(buffer);
+        }
+    }
+
     @Override
     public int mountString(String str) {
         int address = IMAGE_BASE + DATA_SECTION_VIRTUAL_ADDRESS;
@@ -304,7 +336,7 @@ public class WinI386 implements Exporter {
 
         Instruction instruction;
         try {
-            Class<?> clazz = Class.forName("ru.deewend.tennessinec.instruction.I386" + name);
+            Class<?> clazz = Class.forName(INSTRUCTION_CLASS_PREFIX + name);
             Constructor<?> constructor = clazz.getConstructor(Exporter.class, parameter.getClass());
 
             instruction = (Instruction) constructor.newInstance(this, parameter);
@@ -326,12 +358,52 @@ public class WinI386 implements Exporter {
     }
 
     @Override
+    public int searchLabelAndGetAddress(String name, boolean rightToLeft) {
+        if (encodingPhase == ENCODING_PHASE_CALCULATING_LABEL_ADDRESSES && !rightToLeft) {
+            throw new IllegalStateException("Left-to-right searching " +
+                    "mode is unsupported during CALCULATING_LABEL_ADDRESSES phase");
+        }
+        I386Label result = null;
+        if (rightToLeft) {
+            for (int i = currentInstructionIdx - 1; i >= 0; i--) {
+                result = checkLabel(instructionList.get(i), name);
+                if (result != null) break;
+            }
+        } else {
+            for (int i = currentInstructionIdx + 1; i < instructionList.size(); i++) {
+                result = checkLabel(instructionList.get(i), name); // fixme don't duplicate code
+                if (result != null) break;
+            }
+        }
+        if (result == null) {
+            throw new RuntimeException("Label \"" + name + "\" was not found " +
+                    "in " + (rightToLeft ? "right-to-left" : "left-to-right") + " mode");
+        }
+
+        return result.getVirtualAddress();
+    }
+
+    private I386Label checkLabel(Instruction instruction, String labelName) {
+        if (!(instruction instanceof I386Label)) return null;
+
+        I386Label label = (I386Label) instruction;
+        if (!label.getName().equals(labelName)) return null;
+
+        return label;
+    }
+
+    @Override
     public int currentVirtualAddress() {
         checkBuffer();
 
-        int offset = buffer.position() - CODE_SECTION_START;
+        int offset = buffer.position() - (encodingPhase == ENCODING_PHASE_FINAL ? CODE_SECTION_START : 0);
 
         return IMAGE_BASE + CODE_SECTION_VIRTUAL_ADDRESS + offset;
+    }
+
+    @Override
+    public int currentEncodingPhase() {
+        return encodingPhase;
     }
 
     private void checkBuffer() {

@@ -1,5 +1,6 @@
 package ru.deewend.tennessinec.instruction;
 
+import ru.deewend.tennessinec.Helper;
 import ru.deewend.tennessinec.TFunction;
 import ru.deewend.tennessinec.exporter.Exporter;
 
@@ -17,7 +18,7 @@ public class I386CallFunction implements Instruction {
     @Override
     public void encode(ByteBuffer buffer) {
         int virtualAddress = function.getVirtualAddress();
-        if (virtualAddress == TFunction.UNINITIALIZED_VIRTUAL_ADDRESS) {
+        if (virtualAddress == Helper.UNINITIALIZED_VIRTUAL_ADDRESS) {
             throw new RuntimeException("Virtual address of function \"" + function.toStringExtended() + "\" is " +
                     "unknown");
         }
