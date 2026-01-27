@@ -1,5 +1,26 @@
+![TennessineC logotype](misc/logotype.png)
+
 # TennessineC
-To be documented.
+A small C compiler, written in pure Java, which is able to craft i386 Windows executables. I was inspired to start
+this project after checking out the documentation which fits into a single PNG image –
+[PE101](https://github.com/corkami/pics/tree/master/binary/pe101).
+
+Currently, supports basic FFI (via `#pragma tenc import` directives), variables, functions (still WIP though), "while"
+loops, "if" statements, expressions containing braces, variables, function calls, constants and summation, subtraction
+operators. The sole data type currently supported is `int` (32-bit word).
+
+Note that at this moment I don't plan to strictly follow any of currently existing C standards, so this will probably
+remain a toy compiler.
+
+## Obtaining a pre-built binary
+Please navigate to [Releases](https://github.com/minecraft8997/TennessineC/releases) section.
+
+## Compiling [`examples/test.c`](https://github.com/minecraft8997/TennessineC/blob/master/examples/test.c)
+
+Use the following command: `java -jar TennessineC.jar -s examples/test.c -dp -e WinI386 -o test.exe`
+(-dp stands for Debug Preprocessor)
+
+The compiler should craft the `test.exe` file.
 
 ## Building
 Step 1. Ensure you have JDK 8 (or above) installed;
@@ -17,9 +38,3 @@ Step 6. Press Apply;
 Step 7. Navigate to Build -> Build Artifacts... -> TennessineC:jar -> Build;
 
 Step 8. Your jarfile will be located in the `out/artifacts/TennessineC_jar` folder.
-
-## Compiling `examples/test.c`
-
-Use the following command: `java -jar TennessineC.jar -s examples/test.c -dp -e WinI386 -o test.exe` (-dp stands for Debug Preprocessor)
-
-The compiler should craft the `test.exe` file.

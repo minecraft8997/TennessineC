@@ -1,6 +1,7 @@
 package ru.deewend.tennessinec.exporter;
 
 import ru.deewend.tennessinec.*;
+import ru.deewend.tennessinec.instruction.I386Label;
 import ru.deewend.tennessinec.instruction.Instruction;
 
 import java.lang.reflect.Constructor;
@@ -15,6 +16,7 @@ public class WinI386 implements Exporter {
     public static final int SIZE_OF_HEADERS = 0x800;
     public static final int IMPORTS_VA = 0x2000;
     public static final int CODE_SECTION_START = 0x200;
+    public static final int CODE_SECTION_VIRTUAL_ADDRESS = 0x1000;
     public static final int MAX_CODE_BYTES = SIZE_OF_HEADERS;
     public static final int IMPORTS_SECTION_START = CODE_SECTION_START + MAX_CODE_BYTES;
     public static final int MAX_IMPORTS_BYTES = SIZE_OF_HEADERS;
@@ -22,10 +24,17 @@ public class WinI386 implements Exporter {
     public static final int MAX_DATA_BYTES = SIZE_OF_HEADERS;
     public static final int DATA_SECTION_VIRTUAL_ADDRESS = 0x3000;
 
-    private final List<Instruction> instructionList = new ArrayList<>();
+    public static final int ENCODING_PHASE_CALCULATING_LABEL_ADDRESSES = 1;
+    public static final int ENCODING_PHASE_FINAL = 2;
+
+    private static final String INSTRUCTION_CLASS_PREFIX = "ru.deewend.tennessinec.instruction.I386";
+
+    private List<Instruction> instructionList = new ArrayList<>();
     private final List<byte[]> stringList = new LinkedList<>();
     private Metadata metadata;
+    private int encodingPhase;
     private ByteBuffer buffer;
+    private int currentInstructionIdx;
 
     @Override
     public void load(Metadata metadata) {
@@ -63,11 +72,11 @@ public class WinI386 implements Exporter {
 
         // Optional header
         buffer.putShort((short) 0x10B); // 32 bit
-        buffer.putShort((short) 0); // padding
+        buffer.putShort((short) 0);
         buffer.putInt(0);
         buffer.putInt(0);
         buffer.putInt(0);
-        buffer.putInt(0x1000); // RVA of entry point
+        buffer.putInt(0x1000); // RVA of entry point (to be modified later)
         buffer.putInt(0); // padding
         buffer.putInt(0);
         buffer.putInt(IMAGE_BASE); // ImageBase
@@ -109,7 +118,7 @@ public class WinI386 implements Exporter {
         buffer.put((byte) 0);
         buffer.put((byte) 0);
         buffer.putInt(0x1000); // VirtualSize
-        buffer.putInt(0x1000); // VirtualAddress
+        buffer.putInt(CODE_SECTION_VIRTUAL_ADDRESS); // VirtualAddress
         buffer.putInt(MAX_CODE_BYTES); // size of raw data
         buffer.putInt(CODE_SECTION_START); // pointer to raw data
         buffer.putInt(0); // padding
@@ -144,22 +153,22 @@ public class WinI386 implements Exporter {
 
         // imports
 
-        Set<Pair<LibraryName, Set<TMethod>>> importsSet = metadata.importsSet();
-        int methodCount = 0;
-        int methodsLength = 0;
-        for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
-            Set<TMethod> externalMethods = pair.getSecond();
-            methodCount += externalMethods.size();
-            for (TMethod method : externalMethods) {
-                methodsLength += 2 + method.getName().length() + 1; // check encoding?
+        Set<Pair<LibraryName, Set<TFunction>>> importsSet = metadata.importsSet();
+        int functionCount = 0;
+        int functionsLength = 0;
+        for (Pair<LibraryName, Set<TFunction>> pair : importsSet) {
+            Set<TFunction> externalFunctions = pair.getSecond();
+            functionCount += externalFunctions.size();
+            for (TFunction function : externalFunctions) {
+                functionsLength += 2 + function.getName().length() + 1; // check encoding?
             }
         }
-        int sectionSize = (methodCount + 1) * 20; // 20 = sizeof(int) * fieldsCount
-        int methodPointersLength = methodCount * 8;
-        sectionSize += methodPointersLength;
-        sectionSize += methodsLength;
-        sectionSize += methodPointersLength;
-        for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
+        int sectionSize = (functionCount + 1) * 20; // 20 = sizeof(int) * fieldsCount
+        int functionPointersLength = functionCount * 8;
+        sectionSize += functionPointersLength;
+        sectionSize += functionsLength;
+        sectionSize += functionPointersLength;
+        for (Pair<LibraryName, Set<TFunction>> pair : importsSet) {
             LibraryName name = pair.getFirst();
             sectionSize += name.getName().length() + 1; // null terminator
         }
@@ -168,7 +177,7 @@ public class WinI386 implements Exporter {
 
         int currentPointer = sectionSize;
         Map<LibraryName, Integer> libraryNamePointers = new HashMap<>();
-        for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
+        for (Pair<LibraryName, Set<TFunction>> pair : importsSet) {
             LibraryName name = pair.getFirst();
             String uppercaseName = name.defaultCase();
             byte[] bytes = (uppercaseName + "\0").getBytes(StandardCharsets.US_ASCII);
@@ -180,20 +189,20 @@ public class WinI386 implements Exporter {
             importsBuffer.position(currentPointer);
             importsBuffer.put(bytes, 0, length);
         }
-        currentPointer -= methodPointersLength; // we'll fill it later
+        currentPointer -= functionPointersLength; // we'll fill it later
         int thePointer0 = currentPointer;
 
-        Map<Pair<LibraryName, TMethod>, Integer> methodNamePointers = new HashMap<>();
+        Map<Pair<LibraryName, TFunction>, Integer> functionNamePointers = new HashMap<>();
         boolean firstTime = true;
         int end = 0;
         int start = 0;
-        int methodsWritten = 0;
-        int pointerToCurrentPointerToMethodName = currentPointer - methodsLength - 8;
-        for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
+        int functionsWritten = 0;
+        int pointerToCurrentPointerToFunctionName = currentPointer - functionsLength - 8;
+        for (Pair<LibraryName, Set<TFunction>> pair : importsSet) {
             LibraryName libraryName = pair.getFirst();
 
-            for (TMethod method : pair.getSecond()) {
-                String name = method.getName();
+            for (TFunction function : pair.getSecond()) {
+                String name = function.getName();
                 //               hint
                 byte[] bytes = ("\0\0" + name + "\0").getBytes(StandardCharsets.US_ASCII);
                 int length = bytes.length;
@@ -204,7 +213,7 @@ public class WinI386 implements Exporter {
                 importsBuffer.position(payloadPointer);
                 importsBuffer.put(bytes, 0, length);
 
-                int thePointer = pointerToCurrentPointerToMethodName - (8 * methodsWritten);
+                int thePointer = pointerToCurrentPointerToFunctionName - (8 * functionsWritten);
                 importsBuffer.putLong(thePointer, (IMPORTS_VA + payloadPointer));
                 if (firstTime) {
                     end = thePointer + 8;
@@ -213,20 +222,20 @@ public class WinI386 implements Exporter {
                 }
                 start = thePointer;
 
-                methodNamePointers.put(Pair.of(libraryName, method), thePointer);
+                functionNamePointers.put(Pair.of(libraryName, function), thePointer);
 
-                methodsWritten++;
+                functionsWritten++;
             }
         }
         importsBuffer.position(0);
 
-        for (Pair<LibraryName, Set<TMethod>> pair : importsSet) {
+        for (Pair<LibraryName, Set<TFunction>> pair : importsSet) {
             LibraryName libraryName = pair.getFirst();
 
-            for (TMethod method : pair.getSecond()) {
-                int pointer1 = IMPORTS_VA + methodNamePointers.get(Pair.of(libraryName, method));
+            for (TFunction function : pair.getSecond()) {
+                int pointer1 = IMPORTS_VA + functionNamePointers.get(Pair.of(libraryName, function));
                 int pointerToLibraryName = IMPORTS_VA + libraryNamePointers.get(libraryName);
-                int pointer2 = pointer1 + methodsLength + methodPointersLength;
+                int pointer2 = pointer1 + functionsLength + functionPointersLength;
 
                 importsBuffer.putInt(pointer1);
                 importsBuffer.putInt(0);
@@ -234,7 +243,7 @@ public class WinI386 implements Exporter {
                 importsBuffer.putInt(pointerToLibraryName);
                 importsBuffer.putInt(pointer2);
 
-                method.setVirtualAddress(IMAGE_BASE + pointer2);
+                function.setVirtualAddress(IMAGE_BASE + pointer2);
             }
         }
         importsBuffer.putInt(0);
@@ -249,15 +258,32 @@ public class WinI386 implements Exporter {
 
         Helper.writeNullUntil(buffer, CODE_SECTION_START);
 
+        // FIXME (eventually). Encoding instructions twice just because of labels isn't a really nice solution
+        List<Instruction> instructionListReference = instructionList;
+        this.buffer = ByteBuffer.allocate(SIZE_OF_HEADERS);
+        // we don't really need to specify endianness for this buffer
+        instructionList = new ArrayList<>(instructionList);
+        encodingPhase = ENCODING_PHASE_CALCULATING_LABEL_ADDRESSES;
+
+        encodeInstructions();
+
         this.buffer = buffer;
-        // it's not replaceable
-        //noinspection ForLoopReplaceableByForEach
-        for (int i = 0; i < instructionList.size(); i++) {
-            Instruction instruction = instructionList.get(i);
-            instruction.encode(buffer);
-        }
-        this.buffer = null;
+        instructionList = instructionListReference;
+        encodingPhase = ENCODING_PHASE_FINAL;
+
+        encodeInstructions();
+
+        // TODO likely is a subject for removal. If an overflow didn't occur with a temporary Buffer,
+        //  it won't occur here
         checkOverflow(buffer.position() - CODE_SECTION_START);
+
+        TFunction entryFunction = TFunction.lookupEntryFunction();
+        int entryVirtualAddress = entryFunction.getVirtualAddress();
+        if (entryVirtualAddress == Helper.UNINITIALIZED_VIRTUAL_ADDRESS) {
+            throw new AssertionError("Virtual address of the entry function is uninitialized. " +
+                    "Most likely a compiler bug");
+        }
+        buffer.putInt(0x68 /* 0x58 + 16 bytes */, entryVirtualAddress - IMAGE_BASE);
 
         Helper.writeNullUntil(buffer, IMPORTS_SECTION_START);
 
@@ -278,6 +304,21 @@ public class WinI386 implements Exporter {
         }
     }
 
+    private void encodeInstructions() {
+        // don't replace with for each loop, ConcurrentModificationException might be thrown
+        for (currentInstructionIdx = 0; currentInstructionIdx < instructionList.size(); currentInstructionIdx++) {
+            Instruction instruction = instructionList.get(currentInstructionIdx);
+            if (instruction instanceof I386Label) {
+                if (encodingPhase == ENCODING_PHASE_CALCULATING_LABEL_ADDRESSES) {
+                    ((I386Label) instruction).setVirtualAddress(currentVirtualAddress());
+                }
+
+                continue;
+            }
+            instruction.encode(buffer);
+        }
+    }
+
     @Override
     public int mountString(String str) {
         int address = IMAGE_BASE + DATA_SECTION_VIRTUAL_ADDRESS;
@@ -295,7 +336,7 @@ public class WinI386 implements Exporter {
 
         Instruction instruction;
         try {
-            Class<?> clazz = Class.forName("ru.deewend.tennessinec.instruction.I386" + name);
+            Class<?> clazz = Class.forName(INSTRUCTION_CLASS_PREFIX + name);
             Constructor<?> constructor = clazz.getConstructor(Exporter.class, parameter.getClass());
 
             instruction = (Instruction) constructor.newInstance(this, parameter);
@@ -308,14 +349,67 @@ public class WinI386 implements Exporter {
 
     @Override
     public void encodeLastInstruction() {
-        if (buffer == null) {
-            throw new IllegalStateException("Instruction encoding hasn't started or already finished");
-        }
+        checkBuffer();
 
         int idx = instructionList.size() - 1;
         Instruction instruction = instructionList.get(idx);
         instruction.encode(buffer);
         instructionList.remove(idx);
+    }
+
+    @Override
+    public int searchLabelAndGetAddress(String name, boolean rightToLeft) {
+        if (encodingPhase == ENCODING_PHASE_CALCULATING_LABEL_ADDRESSES && !rightToLeft) {
+            throw new IllegalStateException("Left-to-right searching " +
+                    "mode is unsupported during CALCULATING_LABEL_ADDRESSES phase");
+        }
+        I386Label result = null;
+        if (rightToLeft) {
+            for (int i = currentInstructionIdx - 1; i >= 0; i--) {
+                result = checkLabel(instructionList.get(i), name);
+                if (result != null) break;
+            }
+        } else {
+            for (int i = currentInstructionIdx + 1; i < instructionList.size(); i++) {
+                result = checkLabel(instructionList.get(i), name); // fixme don't duplicate code
+                if (result != null) break;
+            }
+        }
+        if (result == null) {
+            throw new RuntimeException("Label \"" + name + "\" was not found " +
+                    "in " + (rightToLeft ? "right-to-left" : "left-to-right") + " mode");
+        }
+
+        return result.getVirtualAddress();
+    }
+
+    private I386Label checkLabel(Instruction instruction, String labelName) {
+        if (!(instruction instanceof I386Label)) return null;
+
+        I386Label label = (I386Label) instruction;
+        if (!label.getName().equals(labelName)) return null;
+
+        return label;
+    }
+
+    @Override
+    public int currentVirtualAddress() {
+        checkBuffer();
+
+        int offset = buffer.position() - (encodingPhase == ENCODING_PHASE_FINAL ? CODE_SECTION_START : 0);
+
+        return IMAGE_BASE + CODE_SECTION_VIRTUAL_ADDRESS + offset;
+    }
+
+    @Override
+    public int currentEncodingPhase() {
+        return encodingPhase;
+    }
+
+    private void checkBuffer() {
+        if (buffer == null) {
+            throw new IllegalStateException("Instruction encoding hasn't started or already finished");
+        }
     }
 
     @Override

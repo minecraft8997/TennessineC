@@ -99,7 +99,7 @@ public class Preprocessor {
         List<List<String>> tokenizedLines;
         File file = new File(compiler.parentDirectory, fileName);
         try (InputStream stream = new FileInputStream(file)) {
-            tokenizedLines = Helper.tokenize(stream);
+            tokenizedLines = Helper.tokenize(stream, file.getPath());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -132,7 +132,7 @@ public class Preprocessor {
             }
             String libraryName = Helper.stringTokenToString(tokenizedCode.nextToken());
             if (tokenizedCode.getNextTokenTypeOmitComma(true) != TokenizedCode.TokenType.SYMBOL) {
-                tokenizedCode.issue("expected a symbol (external method return type)");
+                tokenizedCode.issue("expected a symbol (external function return type)");
             }
             String returnTypeRaw = tokenizedCode.nextToken();
             DataType returnType = DataType.recognizeDataType(returnTypeRaw);
@@ -140,9 +140,9 @@ public class Preprocessor {
                 tokenizedCode.issue("unrecognized data type: " + returnTypeRaw);
             }
             if (tokenizedCode.getNextTokenTypeOmitComma(true) != TokenizedCode.TokenType.LITERAL_STRING) {
-                tokenizedCode.issue("expected a string literal (external method name)");
+                tokenizedCode.issue("expected a string literal (external function name)");
             }
-            String methodName = Helper.stringTokenToString(tokenizedCode.nextToken());
+            String functionName = Helper.stringTokenToString(tokenizedCode.nextToken());
             List<DataType> types = new ArrayList<>();
 
             boolean hasVarargs = false;
@@ -176,7 +176,7 @@ public class Preprocessor {
 
             tokenizedCode.removeLine(compiler.idx);
 
-            compiler.metadata.addImport(libraryName, returnType, methodName, types, hasVarargs);
+            compiler.metadata.addImport(libraryName, returnType, functionName, types, hasVarargs);
 
             return true;
         }
@@ -202,7 +202,7 @@ public class Preprocessor {
                         break;
                     }
                     default: {
-                        tokenizedCode.issue("Subsystems other than \"gui\" and \"cli\" are currently unsupported");
+                        tokenizedCode.issue("Subsystems other than \"gui\" and \"cli\" are unsupported");
 
                         break;
                     }
@@ -359,7 +359,7 @@ public class Preprocessor {
         while (tokenizedCode.hasMoreTokens()) {
             String nextToken = tokenizedCode.nextToken();
             if (isDefine && !tokenizedCode.hasMoreTokens() && nextToken.equals("\\")) {
-                tokenizedCode.issue("multi-line #defines are not supported");
+                tokenizedCode.issue("multi-line #defines are unsupported in this TennessineC version");
             }
             value.add(nextToken);
         }

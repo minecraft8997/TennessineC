@@ -170,7 +170,7 @@ public class TennessineC {
     public void load() {
         // assuming sourceStream will be closed by the caller
         // both BufferedStream and InputStreamReader themselves don't hold any native resources, not closing them
-        List<List<String>> tokenizedLines = Helper.tokenize(sourceStream);
+        List<List<String>> tokenizedLines = Helper.tokenize(sourceStream, sourceFilename);
 
         this.tokenizedLines = TokenizedCode.of(tokenizedLines, sourceFilename);
         Thread.currentThread().setUncaughtExceptionHandler((t, e) -> {
@@ -224,93 +224,193 @@ public class TennessineC {
 
         idx = 0;
         tokenizedLines.switchToLine(0);
-        int methodCount = 0;
+
+        boolean loopScope;
+        TFunction functionBeingParsed = null;
         while (hasMoreTokens()) {
             String nextToken;
             if (Scope.isRootScope()) {
                 nextToken = nextToken();
-                if (!nextToken.equals("int") && !nextToken.equals("void")) {
-                    tokenizedLines.issue("unexpected token: " + nextToken);
-                }
 
+                DataType type = DataType.recognizeDataType(nextToken);
+                if (type == null) {
+                    tokenizedLines.issue("unexpected token: " + nextToken);
+
+                    return;
+                }
                 String name = nextToken();
                 String action = nextToken();
-                if (action.equals("=")) tokenizedLines.issue("global variables are currently unsupported");
-                if (!action.equals("(")) tokenizedLines.issue("expected \"(\", found: " + action);
-                if (!name.equals("main")) tokenizedLines.issue("methods other than \"main\" are currently unsupported");
-                if (!nextToken().equals(")")) tokenizedLines.issue("method parameters are currently unsupported");
-                if (!nextToken().equals("{")) tokenizedLines.issue("expected an opening curly brace");
-                if (methodCount > 0) tokenizedLines.issue("defining multiple methods is currently unsupported");
+                if (action.equals("=") || action.equals(";")) {
+                    type.checkCanBeUsedForVariableDefinition();
 
-                exporter.putInstruction("DefineMethod", Scope.METHOD_STACK_SIZE);
+                    tokenizedLines.issue("global variables are unsupported in this TennessineC version");
+                }
+                if (!action.equals("(")) tokenizedLines.issue("expected an opening brace (\"(\"), found: " + action);
 
                 Scope.pushScope();
+                nextToken = nextToken();
+                boolean hasVarargs = false;
+                List<DataType> parameterTypes = new ArrayList<>();
+                boolean shouldSeekForParameters = !nextToken.equals(")");
+                while (shouldSeekForParameters) {
+                    if (nextToken.equals("...")) {
+                        hasVarargs = true;
+                        // leaving shouldSeekForParameters true?
+
+                        break;
+                    }
+                    DataType parameterType = DataType.recognizeDataType(nextToken);
+                    if (parameterType == null || !parameterType.canBeUsedForVariableDefinition()) {
+                        tokenizedLines.issue("expected a valid parameter data type, found: " + nextToken);
+                    }
+                    String parameterName = nextToken();
+                    VariableData data = VariableData.of(parameterType);
+                    Scope.addVariable(parameterName, data, true);
+                    parameterTypes.add(parameterType);
+
+                    nextToken = nextToken();
+                    if (nextToken.equals(")")) {
+                        shouldSeekForParameters = false;
+                    } else if (!nextToken.equals(",")) {
+                        tokenizedLines.issue("expected a comma, found: " + nextToken);
+                    }
+                    if (shouldSeekForParameters) nextToken = nextToken();
+                }
+                if (!nextToken().equals("{")) tokenizedLines.issue("expected an opening curly brace");
+
+                functionBeingParsed = TFunction.of(false, type, name, parameterTypes, hasVarargs);
+                exporter.putInstruction("DefineFunction", functionBeingParsed);
             }
             boolean symbol = nextTokenIs(TokenizedCode.TokenType.SYMBOL);
             nextToken = nextToken();
-            if (nextToken.equals("}")) {
-                Scope.popScope();
-                methodCount++;
+            if (nextToken.equals("{")) {
+                Scope.pushScope();
 
                 continue;
             }
-            DataType type = DataType.recognizeDataType(nextToken);
+            if (nextToken.equals("}")) {
+                if (Scope.hasMetadata("conditionScope")) {
+                    String labelName;
+                    if (Scope.hasMetadata("loopScope")) {
+                        exporter.putInstruction("Jmp", Pair.of("LoopCondition", true));
 
-            if (type != null) {
-                if (!type.canBeUsedForVariableDefinition()) {
-                    tokenizedLines.issue("type " + type + " cannot be used for variable definition");
+                        labelName = "LoopEnd";
+                    } else {
+                        labelName = "ConditionalBlockEnd";
+                    }
+
+                    exporter.putInstruction("Label", labelName);
+                }
+                int stackSize = Scope.popScope();
+                if (stackSize != Scope.NOT_A_FUNCTION_SCOPE) {
+                    //noinspection DataFlowIssue
+                    functionBeingParsed.setStackSize(stackSize);
+                    if (functionBeingParsed.isEntryFunction()) putExitProcess();
+                    finishFunction();
+                    functionBeingParsed = null;
                 }
 
-                handleVariableDefinition(type);
+                continue;
+            }
+            if (nextToken.equals("return")) {
+                List<String> tokens = collectTokensUntilStatementEnd();
+                //noinspection DataFlowIssue
+                boolean voidReturnValue = (functionBeingParsed.getReturnType() == DataType.VOID);
+                if (!tokens.isEmpty()) {
+                    if (voidReturnValue) {
+                        tokenizedLines.warning("it is not expected that a void function will return an actual value");
+                    }
+
+                    ExpressionEngine.parseExpression(exporter, tokens, false);
+                } else if (!voidReturnValue) {
+                    tokenizedLines.warning("a non-void function is expected to return an actual value");
+                }
+                finishFunction();
+            } else if ((loopScope = nextToken.equals("while")) || nextToken.equals("if")) {
+                List<String> tokens = new ArrayList<>();
+                String token;
+                // braces are intentionally omitted, ExpressionEngine should be able to handle them
+                while (!(token = nextToken()).equals("{")) {
+                    tokens.add(token);
+                }
+                if (loopScope) {
+                    exporter.putInstruction("Label", "LoopCondition");
+                }
+                ExpressionEngine.parseExpression(exporter, tokens, false);
+
+                exporter.putInstruction("Test", ModRM.builder()
+                        .setMod(ModRM.MOD_REGISTER_TO_REGISTER)
+                        .setReg(ModRM.REG_EAX)
+                        .setRm(ModRM.REG_EAX)
+                        .value()); // TEST EAX,EAX (identical to CMP EAX,0)
+
+                exporter.putInstruction("Jz", Pair.of((loopScope ? "LoopEnd" : "ConditionalBlockEnd"), false));
+
+                Scope.pushScope();
+                Scope.putMetadata("conditionScope", Helper.NOTHING);
+                if (loopScope) {
+                    Scope.putMetadata("loopScope", Helper.NOTHING);
+                }
+
+                continue;
             } else {
-                if (!nextToken().equals("(")) {
-                    tokenizedLines.issue("expected either a variable declaration or a method call " +
-                            "(any other statements are currently unsupported)");
-                }
-                if (!symbol) {
-                    tokenizedLines.issue("unexpected token: " + nextToken);
-                }
+                VariableData data;
+                DataType type = DataType.recognizeDataType(nextToken);
 
-                handleMethodCall(nextToken);
+                if (type != null) {
+                    type.checkCanBeUsedForVariableDefinition();
+
+                    handleVariableStatement(true, type, null);
+                } else if ((data = Scope.findVariable(nextToken, false)) != null) {
+                    handleVariableStatement(false, null, data);
+                } else {
+                    if (!nextToken().equals("(")) {
+                        tokenizedLines.issue("expected either a variable declaration or a function call " +
+                                "(any other statements are unsupported in this TennessineC version)");
+                    }
+                    if (!symbol) {
+                        tokenizedLines.issue("unexpected token: " + nextToken);
+                    }
+
+                    handleFunctionCall(nextToken);
+                }
             }
 
             if (!(nextToken = nextToken()).equals(";")) tokenizedLines.issue("expected \";\", found: " + nextToken);
         }
-
-        putExitProcess();
     }
 
-    private void handleVariableDefinition(DataType recognizedType) {
-        if (getNextTokenType() != TokenizedCode.TokenType.SYMBOL) {
-            tokenizedLines.issue("expected the next token to be a symbol (variable name)");
+    /*
+     * In "definition" mode "recognizedType" is expected to be non-null and "data" to be null.
+     * If "definition" is false, "recognizedType" is expected to be null and "data" to be non-null.
+     */
+    private void handleVariableStatement(boolean definition, DataType recognizedType, VariableData data) {
+        if (definition) {
+            if (getNextTokenType() != TokenizedCode.TokenType.SYMBOL) {
+                tokenizedLines.issue("expected the next token to be a symbol (variable name)");
+            }
+            String variableName = nextToken();
+            Scope.addVariable(variableName, (data = VariableData.of(recognizedType)), false);
         }
-        String variableName = nextToken();
-        VariableData data;
-        Scope.addVariable(variableName, (data = VariableData.of(recognizedType)));
-
         boolean noValue;
         if (!(noValue = nextTokenIs(TokenizedCode.TokenType.STATEMENT_END)) && !nextToken().equals("=")) {
             tokenizedLines.issue("expected an assignment");
         }
-        List<String> tokens = new ArrayList<>();
-        if (noValue) {
-            tokens.add("0");
-        } else {
-            while (!nextTokenIs(TokenizedCode.TokenType.STATEMENT_END)) {
-                tokens.add(nextToken());
+        List<String> tokens = collectTokensUntilStatementEnd();
+        if (noValue) { // might be should use tokens.isEmpty() instead?
+            if (!definition) {
+                tokenizedLines.issue("expected an expression (new variable value) instead of statement termination");
             }
+            tokens.add("0");
         }
         ExpressionEngine.parseExpression(exporter, tokens, false);
 
-        Helper.moveFromEAXToMem(exporter, data);
+        Helper.moveFromRegToMem(exporter, ModRM.REG_EAX, data);
     }
 
-    private void handleMethodCall(String methodName) {
-        List<String> tokens = new ArrayList<>();
-        while (!nextTokenIs(TokenizedCode.TokenType.STATEMENT_END)) {
-            tokens.add(nextToken());
-        }
-        Pair<Integer, Integer> result = ExpressionEngine.parseMethodParameters(exporter, tokens, 0);
+    private void handleFunctionCall(String functionName) {
+        List<String> tokens = collectTokensUntilStatementEnd();
+        Pair<Integer, Integer> result = ExpressionEngine.parseFunctionParameters(exporter, tokens, 0);
         int idx = result.getFirst();
         if (idx != tokens.size() - 1) {
             tokenizedLines.issue("unexpected token(s): " +
@@ -318,16 +418,28 @@ public class TennessineC {
         }
         int parameterCount = result.getSecond();
 
-        TMethod.putCallMethod(exporter, methodName, parameterCount);
+        TFunction.putCallFunction(exporter, functionName, parameterCount);
+    }
+
+    private List<String> collectTokensUntilStatementEnd() {
+        List<String> tokens = new ArrayList<>();
+        while (!nextTokenIs(TokenizedCode.TokenType.STATEMENT_END)) {
+            tokens.add(nextToken());
+        }
+
+        return tokens;
     }
 
     /*
-     * Assuming this is the end of the method.
+     * Assuming this is the end of the function.
      */
     private void putExitProcess() {
         exporter.putInstruction("PushByte", 0);
-        TMethod.putCallMethod(exporter, "ExitProcess", 1);
-        exporter.putInstruction("FinishMethod", Helper.NOTHING);
+        TFunction.putCallFunction(exporter, "ExitProcess", 1);
+    }
+
+    private void finishFunction() {
+        exporter.putInstruction("FinishFunction", Helper.NOTHING);
     }
 
     private boolean nextTokenIs(TokenizedCode.TokenType type) {

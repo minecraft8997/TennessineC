@@ -10,6 +10,8 @@ public class ExpressionEngine {
     private static final byte STAGE_EXPECTING_OPERATOR = 1;
     private static final byte STAGE_EXPECTING_SECOND_OPERAND = 2;
 
+    private static long currentTmpVar = 0;
+
     private ExpressionEngine() {
     }
 
@@ -55,7 +57,7 @@ public class ExpressionEngine {
                  * .setRm(REG2)
                  *
                  * it means you would like to perform MOV REG1,REG2 operation. It works as intended for example
-                 * in I386DefineMethod Instruction (where we perform MOV EBP,ESP), however, to perform
+                 * in I386DefineFunction Instruction (where we perform MOV EBP,ESP), however, to perform
                  * ADD/SUB/MOV EBX,EAX (and vice-versa) we have to put the registers in a different order.
                  * Should probably research the reason eventually.
                  */
@@ -90,22 +92,40 @@ public class ExpressionEngine {
                 exporter.putInstruction("MovEAX", Integer.parseInt(currentToken, base));
             } else if (TokenizedCode.TokenType.SYMBOL.detect(currentToken)) {
                 if (theExpressionTokens.size() > 1 && theExpressionTokens.get(1).equals("(")) {
-                    // this is a method call
+                    // this is a function call
+
+                    // FIXME solve the issue with keeping EBX value when handling inner expressions in a different way
+                    if (Scope.isRootScope()) {
+                        throw new UnsupportedOperationException("Expressions containing function calls " +
+                                "in the root scope are unsupported in this TennessineC version");
+                    }
+                    VariableData tmpVarData = VariableData.of(DataType.INT);
+                    Scope.addVariable("#TmpVar" + (currentTmpVar++), tmpVarData, false);
+                    Helper.moveFromRegToMem(exporter, ModRM.REG_EBX, tmpVarData);
+
                     Pair<Integer, Integer> result =
-                            parseMethodParameters(exporter, theExpressionTokens, 2);
+                            parseFunctionParameters(exporter, theExpressionTokens, 2);
 
                     int idx = result.getFirst();
                     int parameterCount = result.getSecond();
 
-                    TMethod.putCallMethod(exporter, currentToken, parameterCount);
-                    // the return value of the method will be located in the EAX register
+                    // the return value of the function will be located in the EAX register
+                    TFunction.putCallFunction(exporter, currentToken, parameterCount);
+
+                    // restore the previous EBX value
+                    Helper.moveFromMemToReg(exporter, ModRM.REG_EBX, tmpVarData);
+
+                    // move 0 to the place where EBX value was stored, for security measures
+                    // TODO might be we don't need this?
+                    exporter.putInstruction("MovECX", 0);
+                    Helper.moveFromRegToMem(exporter, ModRM.REG_ECX, tmpVarData);
 
                     theExpressionTokens.subList(1, idx + 1).clear();
                 } else {
                     // this is a variable name
 
                     VariableData data = Scope.findVariable(currentToken);
-                    Helper.moveFromMemToEAX(exporter, data);
+                    Helper.moveFromMemToReg(exporter, ModRM.REG_EAX, data);
                 }
             } else {
                 throw new IllegalArgumentException("Invalid expression: unexpected token: " + currentToken);
@@ -170,26 +190,36 @@ public class ExpressionEngine {
     }
 
     /*
-     * Treats each method parameter as an expression and attempts to parse it.
+     * Treats each function parameter as an expression and attempts to parse it.
      * After the parsing is done, pushes the value of EAX register for each parameter (from right to left).
      *
      * The method assumes that theExpressionTokens size is greater than or equal to "startingFrom",
      * theExpressionTokens.get(startingFrom - 2) is the function name (if presented) and that
      * theExpressionTokens.get(startingFrom - 1) is "(" -- an opening brace (if presented).
      */
-    public static Pair<Integer, Integer> parseMethodParameters(
+    public static Pair<Integer, Integer> parseFunctionParameters(
             Exporter exporter, List<String> theExpressionTokens, int startingFrom
     ) {
         int parameterCount = 0;
         int idx = findClosingBraceIdx(theExpressionTokens, null, startingFrom);
         for (int i = idx - 1; i >= startingFrom; i--) {
             int j;
+            int stack = 0;
             List<String> tokensInside = new ArrayList<>();
             for (j = i; j >= startingFrom; j--) {
                 String token = theExpressionTokens.get(j);
-                if (token.equals(",")) break;
+                if (token.equals(")")) {
+                    stack++;
+                } else if (token.equals("(")) {
+                    stack--;
+                    if (stack < 0) throw new IllegalArgumentException("Invalid expression: unexpected opening brace");
+                }
+                if (token.equals(",") && stack == 0) break;
 
                 tokensInside.add(token);
+            }
+            if (stack != 0) {
+                throw new IllegalArgumentException("Invalid expression: expected " + stack + " opening brace(s)");
             }
             Collections.reverse(tokensInside);
 
